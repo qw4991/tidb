@@ -49,17 +49,34 @@ type MLTrainModelExecutor struct {
 }
 
 func (ml *MLTrainModelExecutor) Next(ctx context.Context, req *chunk.Chunk) error {
-	sql := fmt.Sprintf("select type, parameters from mysql.ml_models where name='%v'", ml.v.Model)
+	// read information about this model
 	exec := ml.ctx.(sqlexec.SQLExecutor)
-	rs, err := exec.Execute(ctx, sql)
+	rs, err := exec.ExecuteInternal(ctx, "select type, parameters from mysql.ml_models where name=%?", ml.v.Model)
 	if err != nil {
 		return err
 	}
-	if len(rs) == 0 {
+	sRows, err := resultSetToStringSlice(context.Background(), rs)
+	if err != nil {
+		return err
+	}
+	if len(sRows) == 0 {
 		return errors.New(fmt.Sprintf("model %v not found", ml.v.Model))
 	}
-	sRows, err := resultSetToStringSlice(context.Background(), rs[0])
 	modelType, paraData := sRows[0][0], sRows[0][1]
 	fmt.Println(">>>> ", modelType, paraData)
-	return nil
+
+	// start to training this model
+	modelData, err := ml.train(modelType, paraData)
+	if err != nil {
+		return nil
+	}
+
+	// TODO: save this model
+	_, err = exec.ExecuteInternal(ctx, "update mysql.ml_models set model_data = %? where name = %?", modelData, ml.v.Model)
+	return err
+}
+
+func (ml *MLTrainModelExecutor) train(modelType, paraData string) ([]byte, error) {
+
+	return nil, nil
 }
