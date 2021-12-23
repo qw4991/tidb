@@ -634,6 +634,8 @@ github.com/prometheus/procfs v0.0.5/go.mod h1:4A/X28fw3Fc593LaREMrKMqOKvUAntwMDa
 github.com/prometheus/procfs v0.0.8 h1:+fpWZdT24pJBiqJdAwYBjPSk+5YmQzYNPYzQsdzLkt8=
 github.com/prometheus/procfs v0.0.8/go.mod h1:7Qr8sr6344vo1JqZ6HhLceV9o3AJ1Ff+GxbHq6oeK9A=
 github.com/prometheus/tsdb v0.7.1/go.mod h1:qhTCs0VvXwvX/y3TZrWD7rabWM+ijKTux40TwIPHuXU=
+github.com/qw4990/tipb v0.0.0-20211223123535-275b3b03ff53 h1:pwMqxNDkqIUyE0ej4fCRNiIk8yB+lH1l1vkc3xbsaiw=
+github.com/qw4990/tipb v0.0.0-20211223123535-275b3b03ff53/go.mod h1:A7mrd7WHBl1o63LE2bIBGEJMTNWXqhgmYiOvMLxozfs=
 github.com/qw4991/tidb/parser v0.0.0-20211223094455-81a9e64fcab3 h1:s6uJViJXCFx3bzYP16MbDxR3yV/nmrAo4r9GYbuoY3w=
 github.com/qw4991/tidb/parser v0.0.0-20211223094455-81a9e64fcab3/go.mod h1:ElJiub4lRy6UZDb+0JHDkGEdr6aOli+ykhyej7VCLoI=
 github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0 h1:OdAsTTz6OkFY5QxjkYwrChwuRruF69c169dPK26NUlk=
