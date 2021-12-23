@@ -365,6 +365,13 @@ const (
 		oldReadLease bigint(20) NOT NULL DEFAULT 0,
 		PRIMARY KEY (tid)
 	);`
+
+	CreateTableMLModels = `CREATE TABLE IF NOT EXISTS mysql.ML_models (
+		name varchar(256) UNIQUE KEY,
+		type varchar(256),
+		parameters varchar(512),
+		model_data blob
+	);`
 )
 
 // bootstrap initiates system DB for a store.
@@ -541,11 +548,13 @@ const (
 	// version80 fixes the issue https://github.com/pingcap/tidb/issues/25422.
 	// If the TiDB upgrading from the 4.x to a newer version, we keep the tidb_analyze_version to 1.
 	version80 = 80
+
+	version81 = 81
 )
 
 // currentBootstrapVersion is defined as a variable, so we can modify its value for testing.
 // please make sure this is the largest version
-var currentBootstrapVersion int64 = version80
+var currentBootstrapVersion int64 = version81
 
 var (
 	bootstrapVersion = []func(Session, int64){
@@ -629,6 +638,7 @@ var (
 		upgradeToVer78,
 		upgradeToVer79,
 		upgradeToVer80,
+		upgradeToVer81,
 	}
 )
 
@@ -1655,6 +1665,13 @@ func upgradeToVer80(s Session, ver int64) {
 		mysql.SystemDB, mysql.GlobalVariablesTable, variable.TiDBAnalyzeVersion, 1)
 }
 
+func upgradeToVer81(s Session, ver int64) {
+	if ver >= version81 {
+		return
+	}
+	doReentrantDDL(s, CreateTableMLModels)
+}
+
 func writeOOMAction(s Session) {
 	comment := "oom-action is `log` by default in v3.0.x, `cancel` by default in v4.0.11+"
 	mustExecute(s, `INSERT HIGH_PRIORITY INTO %n.%n VALUES (%?, %?, %?) ON DUPLICATE KEY UPDATE VARIABLE_VALUE= %?`,
@@ -1739,6 +1756,8 @@ func doDDLWorks(s Session) {
 	mustExecute(s, CreateColumnStatsUsageTable)
 	// Create table_cache_meta table.
 	mustExecute(s, CreateTableCacheMetaTable)
+	// ...
+	mustExecute(s, CreateTableMLModels)
 }
 
 // doDMLWorks executes DML statements in bootstrap stage.
