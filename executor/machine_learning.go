@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/distsql"
 	"github.com/pingcap/tidb/infoschema"
 	"github.com/pingcap/tidb/kv"
+	"github.com/pingcap/tidb/util"
 	"strings"
 
 	plannercore "github.com/pingcap/tidb/planner/core"
@@ -156,7 +158,9 @@ func HandleSlaverTrainingReq(req []byte) ([]byte, error) {
 	if err := json.Unmarshal(req, &mlReq); err != nil {
 		return nil, err
 	}
-	fmt.Println(">>>>>>>>>>> receive req >> ", mlReq)
+
+	self := fmt.Sprintf("%v:%v %v", util.GetLocalIP(), config.GetGlobalConfig().Port, config.GetGlobalConfig().Store)
+	fmt.Println(">>>>>>>>>>> receive req >> ", self, mlReq)
 
 	// TODO: train the model with mlReq and return gradients
 
