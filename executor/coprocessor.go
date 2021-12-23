@@ -50,6 +50,10 @@ func NewCoprocessorDAGHandler(sctx sessionctx.Context) *CoprocessorDAGHandler {
 
 // HandleRequest handles the coprocessor request.
 func (h *CoprocessorDAGHandler) HandleRequest(ctx context.Context, req *coprocessor.Request) *coprocessor.Response {
+	if req.Tp == kv.ReqTypeML {
+		return h.handleMLReq(req)
+	}
+
 	e, err := h.buildDAGExecutor(req)
 	if err != nil {
 		return h.buildErrorResponse(err)
@@ -125,6 +129,19 @@ func (h *CoprocessorDAGHandler) buildResponseAndSendToStream(chk *chunk.Chunk, t
 		}
 	}
 	return nil
+}
+
+func (h *CoprocessorDAGHandler) handleMLReq(request *coprocessor.Request) *coprocessor.Response {
+	result, err := HandleSlaverTrainingReq(request.Data)
+
+	resp := new(coprocessor.Response)
+	if err != nil {
+		return h.buildErrorResponse(err)
+	} else {
+		resp.Data = result
+	}
+
+	return resp
 }
 
 func (h *CoprocessorDAGHandler) buildDAGExecutor(req *coprocessor.Request) (Executor, error) {

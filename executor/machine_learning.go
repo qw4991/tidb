@@ -8,7 +8,6 @@ import (
 	"github.com/pingcap/tidb/distsql"
 	"github.com/pingcap/tidb/infoschema"
 	"github.com/pingcap/tidb/kv"
-	"github.com/pingcap/tipb/go-tipb"
 	"strings"
 
 	plannercore "github.com/pingcap/tidb/planner/core"
@@ -80,55 +79,83 @@ func (ml *MLTrainModelExecutor) Next(ctx context.Context, req *chunk.Chunk) erro
 	return err
 }
 
-func (ml *MLTrainModelExecutor) train(ctx context.Context, modelType, paraData string) ([]byte, error) {
-	//slaverAddrs, err := ml.fetchSlaverAddresses()
-	//if err != nil {
-	//	return nil, err
-	//}
+func (ml *MLTrainModelExecutor) train(ctx context.Context, modelType, parameters string) ([]byte, error) {
+	// data partition
+	dataPartitionMap, err := ml.constructDataPartitionMap()
+	if err != nil {
+		return nil, err
+	}
 
 	// TODO: init model data
+	var modelData []byte
 
-	var builder distsql.RequestBuilder
 	for iter := 0; iter < 10000; iter++ {
-		dagPB := ml.constructMLDAGReq(nil)
-		builder.SetDAGRequest(dagPB).SetStoreType(kv.TiDBML)
-		// TODO: set model parameters and init model data
-		req, err := builder.Build()
+		req, err := ml.constructMLReq(iter, dataPartitionMap, modelType, parameters, modelData)
 		if err != nil {
 			return nil, err
 		}
 		resp := ml.ctx.GetClient().Send(ctx, req, ml.ctx.GetSessionVars().KVVars, ml.ctx.GetSessionVars().StmtCtx.MemTracker, false, nil)
 		defer resp.Close()
+
 		for {
 			data, err := resp.Next(ctx)
 			if err != nil {
 				return nil, err
 			}
-			if data == nil {
-				return nil, nil
+			if data == nil { // no more data
+				break
 			}
 		}
+
+		// TODO: update the model data
 	}
 
-	return nil, nil
+	return modelData, nil
 }
 
-func (ml *MLTrainModelExecutor) constructMLDAGReq(plan plannercore.PhysicalPlan) *tipb.DAGRequest {
-	dagReq := &tipb.DAGRequest{}
-	// TODO
+func (ml *MLTrainModelExecutor) constructMLReq(iter int, dataPartitionMap map[string]int, modelType, modelParameters string, modelData []byte) (*kv.Request, error) {
+	var builder distsql.RequestBuilder
+	mlReq := &MLModelReq{iter, dataPartitionMap, modelType, modelParameters, modelData}
+	reqData, err := json.Marshal(mlReq)
+	if err != nil {
+		return nil, err
+	}
 
-	return dagReq
+	builder.SetStoreType(kv.TiDBML)
+	builder.Data = reqData
+	req, err := builder.Build()
+	if err != nil {
+		return nil, err
+	}
+	req.Tp = kv.ReqTypeML
+	return req, nil
 }
 
-func (ml *MLTrainModelExecutor) fetchSlaverAddresses() ([]string, error) {
+func (ml *MLTrainModelExecutor) constructDataPartitionMap() (map[string]int, error) {
 	serversInfo, err := infoschema.GetClusterServerInfo(ml.ctx)
 	if err != nil {
 		return nil, err
 	}
-	addrs := make([]string, 0, len(serversInfo))
-	for _, s := range serversInfo {
-		addrs = append(addrs, s.Address)
+	m := make(map[string]int)
+	for i, s := range serversInfo {
+		m[s.Address] = i
 	}
-	// TODO: filter the master from these addresses?
-	return addrs, nil
+	return m, nil
+}
+
+type MLModelReq struct {
+	Iter             int
+	DataPartitionMap map[string]int
+	ModelType        string
+	Parameters       string
+	ModelData        []byte
+}
+
+func HandleSlaverTrainingReq(req []byte) ([]byte, error) {
+	var mlReq MLModelReq
+	if err := json.Unmarshal(req, &mlReq); err != nil {
+		return nil, err
+	}
+	fmt.Println(">>>>>>>>>>> receive req >> ", mlReq)
+	return nil, nil
 }

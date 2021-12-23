@@ -33,10 +33,3 @@ func NewMLTrainModel(stmt *ast.TrainModelStmt) *MLTrainModel {
 		Query: stmt.Query,
 	}
 }
-
-type MLSlaverTrainModel struct {
-	physicalSchemaProducer
-
-	ModelType string
-	ParamData string
-}
