@@ -5,6 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/pingcap/tidb/distsql"
+	"github.com/pingcap/tidb/infoschema"
+	"github.com/pingcap/tidb/kv"
+	"github.com/pingcap/tipb/go-tipb"
 	"strings"
 
 	plannercore "github.com/pingcap/tidb/planner/core"
@@ -66,7 +70,7 @@ func (ml *MLTrainModelExecutor) Next(ctx context.Context, req *chunk.Chunk) erro
 	fmt.Println(">>>> ", modelType, paraData)
 
 	// start to training this model
-	modelData, err := ml.train(modelType, paraData)
+	modelData, err := ml.train(ctx, modelType, paraData)
 	if err != nil {
 		return nil
 	}
@@ -76,7 +80,52 @@ func (ml *MLTrainModelExecutor) Next(ctx context.Context, req *chunk.Chunk) erro
 	return err
 }
 
-func (ml *MLTrainModelExecutor) train(modelType, paraData string) ([]byte, error) {
+func (ml *MLTrainModelExecutor) train(ctx context.Context, modelType, paraData string) ([]byte, error) {
+	//slaverAddrs, err := ml.fetchSlaverAddresses()
+	//if err != nil {
+	//	return nil, err
+	//}
+
+	var builder distsql.RequestBuilder
+	for iter := 0; iter < 3; iter++ {
+		dagPB := ml.constructMLDAGReq(nil)
+		builder.SetDAGRequest(dagPB).SetStoreType(kv.TiDBML)
+		req, err := builder.Build()
+		if err != nil {
+			return nil, err
+		}
+		resp := ml.ctx.GetClient().Send(ctx, req, ml.ctx.GetSessionVars().KVVars, ml.ctx.GetSessionVars().StmtCtx.MemTracker, false, nil)
+		defer resp.Close()
+		for {
+			data, err := resp.Next(ctx)
+			if err != nil {
+				return nil, err
+			}
+			if data == nil {
+				return nil, nil
+			}
+		}
+	}
 
 	return nil, nil
+}
+
+func (ml *MLTrainModelExecutor) constructMLDAGReq(plan plannercore.PhysicalPlan) *tipb.DAGRequest {
+	dagReq := &tipb.DAGRequest{}
+	// TODO
+
+	return dagReq
+}
+
+func (ml *MLTrainModelExecutor) fetchSlaverAddresses() ([]string, error) {
+	serversInfo, err := infoschema.GetClusterServerInfo(ml.ctx)
+	if err != nil {
+		return nil, err
+	}
+	addrs := make([]string, 0, len(serversInfo))
+	for _, s := range serversInfo {
+		addrs = append(addrs, s.Address)
+	}
+	// TODO: filter the master from these addresses?
+	return addrs, nil
 }

@@ -271,6 +271,8 @@ const (
 	TiFlash
 	// TiDB means the type of a store is TiDB.
 	TiDB
+	// TiDBML
+	TiDBML
 	// UnSpecified means the store type is unknown
 	UnSpecified = 255
 )

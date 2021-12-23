@@ -184,6 +184,8 @@ func buildCopTasks(bo *Backoffer, cache *RegionCache, ranges *KeyRanges, req *kv
 
 	if req.StoreType == kv.TiDB {
 		return buildTiDBMemCopTasks(ranges, req)
+	} else if req.StoreType == kv.TiDBML {
+		return buildTiDBMLCopTasks(req)
 	}
 
 	rangesLen := ranges.Len()
@@ -238,6 +240,28 @@ func buildCopTasks(bo *Backoffer, cache *RegionCache, ranges *KeyRanges, req *kv
 			zap.Int("task len", len(tasks)))
 	}
 	metrics.TxnRegionsNumHistogramWithCoprocessor.Observe(float64(len(tasks)))
+	return tasks, nil
+}
+
+func buildTiDBMLCopTasks(req *kv.Request) ([]*copTask, error) {
+	servers, err := infosync.GetAllServerInfo(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	tasks := make([]*copTask, 0, len(servers))
+	for _, ser := range servers {
+		if req.TiDBServerID > 0 && req.TiDBServerID != ser.ServerIDGetter() {
+			continue
+		}
+
+		addr := ser.IP + ":" + strconv.FormatUint(uint64(ser.StatusPort), 10)
+		tasks = append(tasks, &copTask{
+			respChan:  make(chan *copResponse, 2),
+			cmdType:   tikvrpc.CmdCop,
+			storeType: req.StoreType,
+			storeAddr: addr,
+		})
+	}
 	return tasks, nil
 }
 
