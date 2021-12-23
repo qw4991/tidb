@@ -4,6 +4,8 @@ import (
 	"github.com/pingcap/tidb/parser/ast"
 )
 
+// TODO: support show models
+
 type MLCreateModel struct {
 	baseSchemaProducer
 
