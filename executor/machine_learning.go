@@ -157,5 +157,8 @@ func HandleSlaverTrainingReq(req []byte) ([]byte, error) {
 		return nil, err
 	}
 	fmt.Println(">>>>>>>>>>> receive req >> ", mlReq)
+
+	// TODO: train the model with mlReq and return gradients
+
 	return nil, nil
 }
