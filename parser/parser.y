@@ -96,7 +96,7 @@ import (
 	constraint        "CONSTRAINT"
 	convert           "CONVERT"
 	create            "CREATE"
-	model             "MODEL"
+	xmodel            "MODEL"
 	train             "TRAIN"
 	cross             "CROSS"
 	cumeDist          "CUME_DIST"

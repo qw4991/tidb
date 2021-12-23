@@ -2614,14 +2614,46 @@ func (n *RestartStmt) Accept(v Visitor) (Node, bool) {
 type CreateModelStmt struct {
 	stmtNode
 
-	Name string
+	Name model.CIStr
+}
+
+// Restore implements Node interface.
+func (n *CreateModelStmt) Restore(ctx *format.RestoreCtx) error {
+	ctx.WriteKeyWord("CREATE MODEL ")
+	ctx.WriteString(n.Name.O)
+	return nil
+}
+
+func (n *CreateModelStmt) Accept(v Visitor) (Node, bool) {
+	newNode, skipChildren := v.Enter(n)
+	if skipChildren {
+		return v.Leave(newNode)
+	}
+	n = newNode.(*CreateModelStmt)
+	return v.Leave(n)
 }
 
 // TrainModelStmt ...
 type TrainModelStmt struct {
 	stmtNode
 
-	Name string
+	Name model.CIStr
+}
+
+// Restore implements Node interface.
+func (n *TrainModelStmt) Restore(ctx *format.RestoreCtx) error {
+	ctx.WriteKeyWord("TRAIN MODEL ")
+	ctx.WriteString(n.Name.O)
+	return nil
+}
+
+func (n *TrainModelStmt) Accept(v Visitor) (Node, bool) {
+	newNode, skipChildren := v.Enter(n)
+	if skipChildren {
+		return v.Leave(newNode)
+	}
+	n = newNode.(*TrainModelStmt)
+	return v.Leave(n)
 }
 
 // HelpStmt is a statement for server side help
