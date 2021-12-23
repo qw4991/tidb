@@ -458,6 +458,15 @@ func RunErrMsgTest(t *testing.T, table []testErrMsgCase) {
 	}
 }
 
+func TestModel(t *testing.T) {
+	table := []testCase{
+		// model
+		{"CREATE MODEL xxx WITH 'k1'='v1'", true, "CREATE MODEL `xxx` WITH 'k1'='v1'"},
+		{"TRAIN MODEL xxx WITH 'SELECT * FROM t'", true, "TRAIN MODEL `xxx` WITH 'SELECT * FROM t'"},
+	}
+	RunTest(t, table, false)
+}
+
 func TestDMLStmt(t *testing.T) {
 	table := []testCase{
 		{"", true, ""},
@@ -595,10 +604,6 @@ func TestDMLStmt(t *testing.T) {
 		{"DO 1", true, "DO 1"},
 		{"DO 1, sleep(1)", true, "DO 1, SLEEP(1)"},
 		{"DO 1 from t", false, ""},
-
-		// model
-		//{"CREATE MODEL xxx WITH 'k1'='v1'", true, "CREATE MODEL xxx WITH 'k1'='v1'"},
-		{"TRAIN MODEL xxx WITH 'SELECT * FROM t'", true, "TRAIN MODEL xxx WITH 'SELECT * FROM t'"},
 
 		// load data
 		{"load data local infile '/tmp/t.csv' into table t1 fields terminated by ',' optionally enclosed by '\"' ignore 1 lines", true, "LOAD DATA LOCAL INFILE '/tmp/t.csv' IGNORE INTO TABLE `t1` FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '\"' IGNORE 1 LINES"},

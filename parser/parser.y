@@ -8058,7 +8058,7 @@ HelpStmt:
 CreateModelStmt:
 	"CREATE" "MODEL" Identifier "WITH" ParameterList
 	{
-		$$ = &ast.CreateModelStmt{Name: model.NewCIStr($3)}
+		$$ = &ast.CreateModelStmt{Name: model.NewCIStr($3), Parameters: $5.([]string)}
 	}
 
 TrainModelStmt:

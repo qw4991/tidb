@@ -2621,13 +2621,13 @@ type CreateModelStmt struct {
 // Restore implements Node interface.
 func (n *CreateModelStmt) Restore(ctx *format.RestoreCtx) error {
 	ctx.WriteKeyWord("CREATE MODEL ")
-	ctx.WriteString(n.Name.O)
-	ctx.WriteString(" WITH ")
+	ctx.WriteName(n.Name.O)
+	ctx.WriteKeyWord(" WITH ")
 	for i := 0; i < len(n.Parameters); i += 2 {
 		if i > 0 {
-			ctx.WriteString(", ")
+			ctx.WritePlain(", ")
 		}
-		ctx.WriteString(fmt.Sprintf("'%v'=%v", n.Parameters[i], n.Parameters[i+1]))
+		ctx.WritePlain(fmt.Sprintf("'%v'='%v'", n.Parameters[i], n.Parameters[i+1]))
 	}
 	return nil
 }
@@ -2652,8 +2652,8 @@ type TrainModelStmt struct {
 // Restore implements Node interface.
 func (n *TrainModelStmt) Restore(ctx *format.RestoreCtx) error {
 	ctx.WriteKeyWord("TRAIN MODEL ")
-	ctx.WriteString(n.Name.O)
-	ctx.WriteString(" WITH ")
+	ctx.WriteName(n.Name.O)
+	ctx.WriteKeyWord(" WITH ")
 	ctx.WriteString(n.Query)
 	return nil
 }
