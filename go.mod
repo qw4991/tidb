@@ -98,7 +98,7 @@ require (
 // we need keep the replacement until go.etcd.io supports the higher version of grpc.
 replace google.golang.org/grpc => google.golang.org/grpc v1.29.1
 
-replace github.com/pingcap/tidb/parser => /Users/zhangyuanjia/Workspace/go/src/github.com/pingcap/tidb/parser
+replace github.com/pingcap/tidb/parser => github.com/qw4991/tidb/parser v0.0.0-20211223094455-81a9e64fcab3
 
 // fix potential security issue(CVE-2020-26160) introduced by indirect dependency.
 replace github.com/dgrijalva/jwt-go => github.com/form3tech-oss/jwt-go v3.2.6-0.20210809144907-32ab6a8243d7+incompatible
