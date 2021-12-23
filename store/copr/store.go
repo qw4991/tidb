@@ -118,7 +118,7 @@ func getEndPointType(t kv.StoreType) tikvrpc.EndpointType {
 		return tikvrpc.TiKV
 	case kv.TiFlash:
 		return tikvrpc.TiFlash
-	case kv.TiDB:
+	case kv.TiDB, kv.TiDBML:
 		return tikvrpc.TiDB
 	default:
 		return tikvrpc.TiKV

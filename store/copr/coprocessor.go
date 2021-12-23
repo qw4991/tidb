@@ -791,7 +791,7 @@ func (worker *copIteratorWorker) handleTaskOnce(bo *Backoffer, task *copTask, ch
 	resp, rpcCtx, storeAddr, err := worker.kvclient.SendReqCtx(bo.TiKVBackoffer(), req, task.region, tikv.ReadTimeoutMedium, getEndPointType(task.storeType), task.storeAddr, ops...)
 	err = derr.ToTiDBErr(err)
 	if err != nil {
-		if task.storeType == kv.TiDB {
+		if task.storeType == kv.TiDB || task.storeType == kv.TiDBML {
 			err = worker.handleTiDBSendReqErr(err, task, ch)
 			return nil, err
 		}
@@ -962,7 +962,7 @@ func (worker *copIteratorWorker) handleCopPagingResult(bo *Backoffer, rpcCtx *ti
 // successful response, otherwise it's nil.
 func (worker *copIteratorWorker) handleCopResponse(bo *Backoffer, rpcCtx *tikv.RPCContext, resp *copResponse, cacheKey []byte, cacheValue *coprCacheValue, task *copTask, ch chan<- *copResponse, lastRange *coprocessor.KeyRange, costTime time.Duration) ([]*copTask, error) {
 	if regionErr := resp.pbResp.GetRegionError(); regionErr != nil {
-		if rpcCtx != nil && task.storeType == kv.TiDB {
+		if rpcCtx != nil && (task.storeType == kv.TiDB || task.storeType == kv.TiDBML) {
 			resp.err = errors.Errorf("error: %v", regionErr)
 			worker.sendToRespCh(resp, ch, true)
 			return nil, nil

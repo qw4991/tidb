@@ -134,6 +134,9 @@ func (r *KeyRanges) Split(key []byte) (*KeyRanges, *KeyRanges) {
 
 // ToPBRanges converts ranges to wire type.
 func (r *KeyRanges) ToPBRanges() []*coprocessor.KeyRange {
+	if r == nil {
+		return nil
+	}
 	ranges := make([]*coprocessor.KeyRange, 0, r.Len())
 	r.Do(func(ran *kv.KeyRange) {
 		ranges = append(ranges, &coprocessor.KeyRange{
