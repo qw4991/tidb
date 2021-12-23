@@ -2614,13 +2614,21 @@ func (n *RestartStmt) Accept(v Visitor) (Node, bool) {
 type CreateModelStmt struct {
 	stmtNode
 
-	Name model.CIStr
+	Name       model.CIStr
+	Parameters []string
 }
 
 // Restore implements Node interface.
 func (n *CreateModelStmt) Restore(ctx *format.RestoreCtx) error {
 	ctx.WriteKeyWord("CREATE MODEL ")
 	ctx.WriteString(n.Name.O)
+	ctx.WriteString(" WITH ")
+	for i := 0; i < len(n.Parameters); i += 2 {
+		if i > 0 {
+			ctx.WriteString(", ")
+		}
+		ctx.WriteString(fmt.Sprintf("'%v'=%v", n.Parameters[i], n.Parameters[i+1]))
+	}
 	return nil
 }
 
@@ -2637,13 +2645,16 @@ func (n *CreateModelStmt) Accept(v Visitor) (Node, bool) {
 type TrainModelStmt struct {
 	stmtNode
 
-	Name model.CIStr
+	Name  model.CIStr
+	Query string
 }
 
 // Restore implements Node interface.
 func (n *TrainModelStmt) Restore(ctx *format.RestoreCtx) error {
 	ctx.WriteKeyWord("TRAIN MODEL ")
 	ctx.WriteString(n.Name.O)
+	ctx.WriteString(" WITH ")
+	ctx.WriteString(n.Query)
 	return nil
 }
 

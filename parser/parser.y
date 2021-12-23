@@ -1022,6 +1022,7 @@ import (
 	TableRefsClause                        "Table references clause"
 	FieldItem                              "Field item for load data clause"
 	FieldItemList                          "Field items for load data clause"
+	ParameterList                          "Parameter List"
 	FuncDatetimePrec                       "Function datetime precision"
 	GetFormatSelector                      "{DATE|DATETIME|TIME|TIMESTAMP}"
 	GlobalScope                            "The scope of variable"
@@ -8055,15 +8056,30 @@ HelpStmt:
 	}
 
 CreateModelStmt:
-	"CREATE" "MODEL" Identifier "WITH"
+	"CREATE" "MODEL" Identifier "WITH" ParameterList
 	{
 		$$ = &ast.CreateModelStmt{Name: model.NewCIStr($3)}
 	}
 
 TrainModelStmt:
-	"TRAIN" "MODEL" Identifier
+	"TRAIN" "MODEL" Identifier "WITH" stringLit
 	{
-		$$ = &ast.TrainModelStmt{Name: model.NewCIStr($3)}
+		$$ = &ast.TrainModelStmt{Name: model.NewCIStr($3), Query: $5}
+	}
+
+ParameterList:
+	ParameterList ',' stringLit "=" stringLit
+	{
+		parameters := $1.([]string)
+		parameters = append(parameters, $3, $5)
+		$$ = parameters
+	}
+|	stringLit "=" stringLit
+	{
+		parameters := make([]string, 2)
+		parameters[0] = $1
+		parameters[1] = $3
+		$$ = parameters
 	}
 
 SelectStmtBasic:
