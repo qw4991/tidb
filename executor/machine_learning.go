@@ -86,10 +86,13 @@ func (ml *MLTrainModelExecutor) train(ctx context.Context, modelType, paraData s
 	//	return nil, err
 	//}
 
+	// TODO: init model data
+
 	var builder distsql.RequestBuilder
-	for iter := 0; iter < 3; iter++ {
+	for iter := 0; iter < 10000; iter++ {
 		dagPB := ml.constructMLDAGReq(nil)
 		builder.SetDAGRequest(dagPB).SetStoreType(kv.TiDBML)
+		// TODO: set model parameters and init model data
 		req, err := builder.Build()
 		if err != nil {
 			return nil, err

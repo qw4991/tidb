@@ -44,6 +44,9 @@ func NewProjInjector() *projInjector {
 }
 
 func (pe *projInjector) inject(plan PhysicalPlan) PhysicalPlan {
+	if plan == nil {
+		return nil
+	}
 	for i, child := range plan.Children() {
 		plan.Children()[i] = pe.inject(child)
 	}
