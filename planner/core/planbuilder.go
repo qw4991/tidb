@@ -743,9 +743,9 @@ func (b *PlanBuilder) Build(ctx context.Context, node ast.Node) (Plan, error) {
 	case *ast.SplitRegionStmt:
 		return b.buildSplitRegion(x)
 	case *ast.CreateModelStmt:
-		return NewLogicalCreateModel(x), nil
+		return NewMLCreateModel(x), nil
 	case *ast.TrainModelStmt:
-		return NewLogicalTrainModel(x), nil
+		return NewMLTrainModel(x), nil
 	}
 	return nil, ErrUnsupportedType.GenWithStack("Unsupported type %T", node)
 }

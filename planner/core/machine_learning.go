@@ -4,29 +4,29 @@ import (
 	"github.com/pingcap/tidb/parser/ast"
 )
 
-type LogicalCreateModel struct {
+type MLCreateModel struct {
 	baseSchemaProducer
 
 	Model      string
 	Parameters []string
 }
 
-func NewLogicalCreateModel(stmt *ast.CreateModelStmt) *LogicalCreateModel {
-	return &LogicalCreateModel{
+func NewMLCreateModel(stmt *ast.CreateModelStmt) *MLCreateModel {
+	return &MLCreateModel{
 		Model:      stmt.Name.O,
 		Parameters: stmt.Parameters,
 	}
 }
 
-type LogicalTrainModel struct {
+type MLTrainModel struct {
 	baseSchemaProducer
 
 	Model string
 	Query string
 }
 
-func NewLogicalTrainModel(stmt *ast.TrainModelStmt) *LogicalTrainModel {
-	return &LogicalTrainModel{
+func NewMLTrainModel(stmt *ast.TrainModelStmt) *MLTrainModel {
+	return &MLTrainModel{
 		Model: stmt.Name.O,
 		Query: stmt.Query,
 	}
