@@ -96,6 +96,8 @@ import (
 	constraint        "CONSTRAINT"
 	convert           "CONVERT"
 	create            "CREATE"
+	model             "MODEL"
+	train             "TRAIN"
 	cross             "CROSS"
 	cumeDist          "CUME_DIST"
 	currentDate       "CURRENT_DATE"
@@ -935,6 +937,8 @@ import (
 	BindableStmt               "Statement that can be created binding on"
 	UpdateStmtNoWith           "Update statement without CTE clause"
 	HelpStmt                   "HELP statement"
+	CreateModelStmt            "Create Model Stmt"
+	TrainModelStmt             "Train Model Stmt"
 
 %type	<item>
 	AdminShowSlow                          "Admin Show Slow statement"
@@ -8050,6 +8054,18 @@ HelpStmt:
 		$$ = &ast.HelpStmt{Topic: $2}
 	}
 
+CreateModelStmt:
+	"CREATE" "MODEL" Identifier "WITH"
+	{
+		$$ = &ast.CreateModelStmt{Name: model.NewCIStr($3)}
+	}
+
+TrainModelStmt:
+	"TRAIN" "MODEL" Identifier
+	{
+		$$ = &ast.TrainModelStmt{Name: model.NewCIStr($3)}
+	}
+
 SelectStmtBasic:
 	"SELECT" SelectStmtOpts SelectStmtFieldList
 	{
@@ -11010,6 +11026,8 @@ Statement:
 |	ShutdownStmt
 |	RestartStmt
 |	HelpStmt
+|	CreateModelStmt
+|	TrainModelStmt
 
 TraceableStmt:
 	DeleteFromStmt

@@ -2610,6 +2610,20 @@ func (n *RestartStmt) Accept(v Visitor) (Node, bool) {
 	return v.Leave(n)
 }
 
+// CreateModelStmt ...
+type CreateModelStmt struct {
+	stmtNode
+
+	Name string
+}
+
+// TrainModelStmt ...
+type TrainModelStmt struct {
+	stmtNode
+
+	Name string
+}
+
 // HelpStmt is a statement for server side help
 // See https://dev.mysql.com/doc/refman/8.0/en/help.html
 type HelpStmt struct {
