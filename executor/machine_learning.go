@@ -15,9 +15,8 @@ import (
 type MLCreateModelExecutor struct {
 	baseExecutor
 
-	v         *plannercore.MLCreateModel
-	modelType string
-	paraMap   map[string]string
+	v       *plannercore.MLCreateModel
+	paraMap map[string]string
 }
 
 func (ml *MLCreateModelExecutor) Open(ctx context.Context) error {
@@ -37,7 +36,7 @@ func (ml *MLCreateModelExecutor) Next(ctx context.Context, req *chunk.Chunk) err
 	if err != nil {
 		return err
 	}
-	sql := fmt.Sprintf("insert into mysql.ml_models values ('%v', '%v', '%v', NULL)", ml.v.Model, ml.modelType, string(paras))
+	sql := fmt.Sprintf("insert into mysql.ml_models values ('%v', '%v', '%v', NULL)", ml.v.Model, ml.paraMap["type"], string(paras))
 	exec := ml.ctx.(sqlexec.SQLExecutor)
 	_, err = exec.Execute(ctx, sql)
 	return err
