@@ -285,6 +285,10 @@ func (b *executorBuilder) build(p plannercore.Plan) Executor {
 		return b.buildCTE(v)
 	case *plannercore.PhysicalCTETable:
 		return b.buildCTETableReader(v)
+	case *plannercore.MLCreateModel:
+		return b.buildMLCreateModelExecutor(v)
+	case *plannercore.MLTrainModel:
+		return b.buildMLTrainModelExecutor(v)
 	default:
 		if mp, ok := p.(MockPhysicalPlan); ok {
 			return mp.GetExecutor()
@@ -292,6 +296,22 @@ func (b *executorBuilder) build(p plannercore.Plan) Executor {
 
 		b.err = ErrUnknownPlan.GenWithStack("Unknown Plan %T", p)
 		return nil
+	}
+}
+
+func (b *executorBuilder) buildMLCreateModelExecutor(v *plannercore.MLCreateModel) Executor {
+	base := newBaseExecutor(b.ctx, v.Schema(), v.ID())
+	return &MLCreateModelExecutor{
+		baseExecutor: base,
+		v:            v,
+	}
+}
+
+func (b *executorBuilder) buildMLTrainModelExecutor(v *plannercore.MLTrainModel) Executor {
+	base := newBaseExecutor(b.ctx, v.Schema(), v.ID())
+	return &MLTrainModelExecutor{
+		baseExecutor: base,
+		v:            v,
 	}
 }
 
