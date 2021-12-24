@@ -87,9 +87,9 @@ func (ml *MLTrainModelExecutor) train(ctx context.Context, modelType, parameters
 		return nil, err
 	}
 
-	// TODO: init the model accroding to parameters: yifan
+	// TODO: init the model accroding to parameters: yifan, lanhai
 
-	// TODO: init model data: yifan
+	// TODO: init model data: yifan, lanhai
 	var modelData []byte
 
 	for iter := 0; iter < 10000; iter++ {
@@ -110,7 +110,7 @@ func (ml *MLTrainModelExecutor) train(ctx context.Context, modelType, parameters
 			}
 		}
 
-		// TODO: update the model data: yifan
+		// TODO: update the model data: yifan, lanhai
 	}
 
 	return modelData, nil
@@ -163,14 +163,14 @@ func HandleSlaverTrainingReq(req []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	// TODO: init the model: yifan
+	// TODO: init the model: yifan, lanhai
 
 	self := fmt.Sprintf("%v:%v %v", util.GetLocalIP(), config.GetGlobalConfig().Port, config.GetGlobalConfig().Store)
 	fmt.Println(">>>>>>>>>>> receive req >> ", self, mlReq)
 
 	// TODO: read data: yuanjia, cache
 
-	// TODO: train the model with mlReq and return gradients: yifan
+	// TODO: train the model with mlReq and return gradients: yifan, lanhai
 
 	return nil, nil
 }
