@@ -76,7 +76,6 @@ func (ml *MLTrainModelExecutor) Next(ctx context.Context, req *chunk.Chunk) erro
 		return nil
 	}
 
-	// TODO: save this model
 	_, err = exec.ExecuteInternal(ctx, "update mysql.ml_models set model_data = %? where name = %?", modelData, ml.v.Model)
 	return err
 }
@@ -88,7 +87,9 @@ func (ml *MLTrainModelExecutor) train(ctx context.Context, modelType, parameters
 		return nil, err
 	}
 
-	// TODO: init model data
+	// TODO: init the model accroding to parameters: yifan
+
+	// TODO: init model data: yifan
 	var modelData []byte
 
 	for iter := 0; iter < 10000; iter++ {
@@ -109,7 +110,7 @@ func (ml *MLTrainModelExecutor) train(ctx context.Context, modelType, parameters
 			}
 		}
 
-		// TODO: update the model data
+		// TODO: update the model data: yifan
 	}
 
 	return modelData, nil
@@ -117,7 +118,7 @@ func (ml *MLTrainModelExecutor) train(ctx context.Context, modelType, parameters
 
 func (ml *MLTrainModelExecutor) constructMLReq(iter int, dataPartitionMap map[string]int, modelType, modelParameters string, modelData []byte) (*kv.Request, error) {
 	var builder distsql.RequestBuilder
-	mlReq := &MLModelReq{iter, dataPartitionMap, modelType, modelParameters, modelData}
+	mlReq := &MLModelReq{iter, dataPartitionMap, modelType, modelParameters, modelData, ""}
 	reqData, err := json.Marshal(mlReq)
 	if err != nil {
 		return nil, err
@@ -151,7 +152,10 @@ type MLModelReq struct {
 	ModelType        string
 	Parameters       string
 	ModelData        []byte
+	Query            string
 }
+
+// train model name with query
 
 func HandleSlaverTrainingReq(req []byte) ([]byte, error) {
 	var mlReq MLModelReq
@@ -159,10 +163,14 @@ func HandleSlaverTrainingReq(req []byte) ([]byte, error) {
 		return nil, err
 	}
 
+	// TODO: init the model: yifan
+
 	self := fmt.Sprintf("%v:%v %v", util.GetLocalIP(), config.GetGlobalConfig().Port, config.GetGlobalConfig().Store)
 	fmt.Println(">>>>>>>>>>> receive req >> ", self, mlReq)
 
-	// TODO: train the model with mlReq and return gradients
+	// TODO: read data: yuanjia, cache
+
+	// TODO: train the model with mlReq and return gradients: yifan
 
 	return nil, nil
 }
