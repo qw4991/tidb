@@ -132,7 +132,7 @@ func (h *CoprocessorDAGHandler) buildResponseAndSendToStream(chk *chunk.Chunk, t
 }
 
 func (h *CoprocessorDAGHandler) handleMLReq(request *coprocessor.Request) *coprocessor.Response {
-	result, err := HandleSlaverTrainingReq(request.Data)
+	result, err := h.HandleSlaverTrainingReq(request.Data)
 
 	resp := new(coprocessor.Response)
 	if err != nil {
