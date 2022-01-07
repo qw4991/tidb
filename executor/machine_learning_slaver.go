@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
+	"github.com/pingcap/tidb/util/chunk"
 	"math"
 	"os"
 	"sync"
@@ -67,7 +68,7 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 	//}
 
 	// TODO: read data: yuanjia, cache
-	xVal, yVal, err := readMLData(h.sctx, params.batchSize, mlReq.Query)
+	xVal, yVal, err := readMLData(h.sctx, params.batchSize, mlReq.Query, "iris")
 	if err != nil {
 		return nil, errors.Trace(err)
 	}
@@ -171,7 +172,7 @@ func init() {
 	cache = newMLDataCache(MB * 16)
 }
 
-func readMLData(sctx sessionctx.Context, batchSize int, query string) (x *tensor.Dense, y *tensor.Dense, err error) {
+func readMLData(sctx sessionctx.Context, batchSize int, query string, caseType string) (x *tensor.Dense, y *tensor.Dense, err error) {
 	// read from the cache
 	if x, y, ok := cache.get(query); ok {
 		return x, y, nil
@@ -197,9 +198,13 @@ func readMLData(sctx sessionctx.Context, batchSize int, query string) (x *tensor
 	//	return nil, nil, errors.Errorf("unsupported training query %v", query)
 	//}
 
+	if caseType == "iris" {
+		return convert4Iris(batchSize, rows)
+	}
+
 	n := len(rows)
 	ac := len(fields)
-	vl := 28*28
+	vl := 28 * 28
 	yl := 10
 	if ac > 2 {
 		vl = 4
@@ -220,7 +225,7 @@ func readMLData(sctx sessionctx.Context, batchSize int, query string) (x *tensor
 				xVal = append(xVal, r.GetFloat64(j))
 			}
 		}
-		vy := r.GetFloat64(ac-1)
+		vy := r.GetFloat64(ac - 1)
 		label := int(vy)
 		for j := 0; j < yl; j++ {
 			if j == label {
@@ -235,4 +240,22 @@ func readMLData(sctx sessionctx.Context, batchSize int, query string) (x *tensor
 	// TODO: 28*28
 	x = tensor.New(tensor.WithShape(batchSize, vl), tensor.WithBacking(xVal))
 	return x, y, nil
+}
+
+func convert4Iris(batchSize int, rows []chunk.Row) (x *tensor.Dense, y *tensor.Dense, err error) {
+	n := len(rows)
+	xs := make([]float64, 0, n*4)
+	ys := make([]float64, 0, n)
+	for i, r := range rows {
+		if i == batchSize {
+			break
+		}
+		x1, x2, x3, x4, y := r.GetFloat32(0), r.GetFloat32(1), r.GetFloat32(2), r.GetFloat32(3), r.GetInt64(4)
+		xs = append(xs, float64(x1), float64(x2), float64(x3), float64(x4))
+		ys = append(ys, float64(y))
+	}
+
+	x = tensor.New(tensor.WithShape(batchSize, 4), tensor.WithBacking(xs))
+	y = tensor.New(tensor.WithShape(batchSize), tensor.WithBacking(ys))
+	return
 }
