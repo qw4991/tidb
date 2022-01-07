@@ -178,11 +178,13 @@ func readMLData(sctx sessionctx.Context, batchSize int, query string) (x *tensor
 	}
 
 	n := len(rows)
-	xVal, yVal := make([]byte, 0, n*28*28), make([]float64, 0, n)
+	xVal, yVal := make([]float64, 0, n*28*28), make([]float64, 0, n)
 	for _, r := range rows {
 		vx := r.GetBytes(0)
 		vy := r.GetFloat64(1)
-		xVal = append(xVal, vx...)
+		for _, v := range vx {
+			xVal = append(xVal, float64(v))
+		}
 		yVal = append(yVal, vy)
 
 		if len(yVal) == batchSize {
