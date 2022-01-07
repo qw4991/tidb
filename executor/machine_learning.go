@@ -71,7 +71,7 @@ func (ml *MLTrainModelExecutor) Next(ctx context.Context, req *chunk.Chunk) erro
 	// start to training this model
 	modelData, err := ml.train(ctx, modelType, paraData)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	_, err = exec.ExecuteInternal(ctx, "update mysql.ml_models set model_data = %? where name = %?", modelData, ml.v.Model)
