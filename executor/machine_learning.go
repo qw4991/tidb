@@ -134,6 +134,7 @@ func (ml *MLTrainModelExecutor) train(ctx context.Context, model, parameters str
 		resp := ml.ctx.GetClient().Send(ctx, req, ml.ctx.GetSessionVars().KVVars, ml.ctx.GetSessionVars().StmtCtx.MemTracker, false, nil)
 		defer resp.Close()
 
+		var slaverGrads [][]gorgonia.Value
 		for {
 			data, err := resp.Next(ctx)
 			if err != nil {
@@ -148,15 +149,17 @@ func (ml *MLTrainModelExecutor) train(ctx context.Context, model, parameters str
 			if err = decoder.Decode(&grads); err != nil {
 				return nil, err
 			}
-			for i, weight := range grads {
-				if err := learnables[i].SetGrad(weight); err != nil {
-					return nil, err
-				}
-			}
-			vg := gorgonia.NodesToValueGrads(learnables)
-			if err := solver.Step(vg); err != nil {
-				return nil, err
-			}
+			slaverGrads = append(slaverGrads, grads)
+		}
+
+		avgGrads, err := calAvgGrads(slaverGrads)
+		if err != nil {
+			return nil, err
+		}
+
+		gradValues := convertGradValues(avgGrads)
+		if err := solver.Step(gradValues); err != nil {
+			return nil, err
 		}
 
 		// TODO: update the model data: yifan, lanhai
@@ -173,6 +176,16 @@ func (ml *MLTrainModelExecutor) train(ctx context.Context, model, parameters str
 	}
 
 	return modelData, nil
+}
+
+func calAvgGrads(slaverGrads [][]gorgonia.Value) ([]gorgonia.Value, error) {
+	// TODO:
+	return slaverGrads[0], nil
+}
+
+func convertGradValues(values []gorgonia.Value) []gorgonia.ValueGrad {
+	// TODO:
+	return nil
 }
 
 func (ml *MLTrainModelExecutor) constructMLReq(iter int, dataPartitionMap map[string]int, model, modelParameters string, modelData []byte) (*kv.Request, error) {
