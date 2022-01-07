@@ -62,7 +62,7 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 	}
 	hiddenUnits, err := string2IntSlice(strHiddenUnits)
 	if err != nil {
-		return nil, errors.Errorf("invalid hidden_units=%v, it must be an array of integers like [2,3,5]", strHiddenUnits)
+		return nil, errors.Errorf("invalid hidden_units=%v, it must be an array of integers like [2,3,5], err=%v", strHiddenUnits, err)
 	}
 	strBatchSize, ok := params["batch_size"]
 	if !ok {
@@ -202,12 +202,15 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 }
 
 func string2IntSlice(str string) ([]int, error) {
-	strSlice := strings.Split(strings.Trim(str, " "), ",")
+	// [1, 2, 3, 4]
+	str = strings.TrimSpace(str)
+	str = str[1 : len(str)-1]
+	strSlice := strings.Split(str, ",")
 	intSlice := make([]int, 0, len(strSlice))
 	for _, s := range strSlice {
-		i, err := strconv.Atoi(strings.Trim(s, " "))
+		i, err := strconv.Atoi(strings.TrimSpace(s))
 		if err != nil {
-			return nil, err
+			return nil, errors.Errorf("invalid intStr=%v", s)
 		}
 		intSlice = append(intSlice, i)
 	}
