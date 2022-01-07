@@ -106,15 +106,15 @@ func constructModel(params modelParams) (g *gorgonia.ExprGraph, x, y *gorgonia.N
 		currentLen = hiddenLen
 		current, err = gorgonia.Mul(current, w)
 		if err != nil {
-			return nil, nil, nil, nil, err
+			return nil, nil, nil, nil, errors.Trace(err)
 		}
 		current, err = gorgonia.Rectify(current)
 		if err != nil {
-			return nil, nil, nil, nil, err
+			return nil, nil, nil, nil, errors.Trace(err)
 		}
 		current, err = gorgonia.Dropout(current, 0.5)
 		if err != nil {
-			return nil, nil, nil, nil, err
+			return nil, nil, nil, nil, errors.Trace(err)
 		}
 	}
 	w := gorgonia.NewMatrix(g, gorgonia.Float64, gorgonia.WithShape(currentLen, params.numClasses), gorgonia.WithName(fmt.Sprintf("w%v", weightNum)), gorgonia.WithInit(gorgonia.Gaussian(0, 0.1)))
@@ -122,33 +122,33 @@ func constructModel(params modelParams) (g *gorgonia.ExprGraph, x, y *gorgonia.N
 	learnables = append(learnables, w)
 	current, err = gorgonia.Mul(current, w)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, errors.Trace(err)
 	}
 	current, err = gorgonia.SoftMax(current)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, errors.Trace(err)
 	}
 
 	// cross entropy loss
 	current, err = gorgonia.Log(current)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, errors.Trace(err)
 	}
 	current, err = gorgonia.Neg(current)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, errors.Trace(err)
 	}
 	current, err = gorgonia.HadamardProd(current, y)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, errors.Trace(err)
 	}
 	loss, err := gorgonia.Mean(current)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, errors.Trace(err)
 	}
 	_, err = gorgonia.Grad(loss, learnables...)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, errors.Trace(err)
 	}
 	return
 }

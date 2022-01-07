@@ -24,7 +24,7 @@ import (
 func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, error) {
 	var mlReq MLModelReq
 	if err := json.Unmarshal(req, &mlReq); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	// TODO: init the model: yifan, lanhai
@@ -37,14 +37,14 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 	}
 	params, err := parseModelParams(mlReq.ModelType, paramMap)
 	if err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	// TODO: loss function and optimizer/solver can also be added in params
 	logutil.BgLogger().Info(fmt.Sprintf("numFeatures = %v, numClasses = %v, hiddenUnits = %v, batchSize = %v, learningRate = %v", params.numFeatures, params.numClasses, params.hiddenUnits, params.batchSize, params.learningRate))
 
 	g, x, y, learnables, err := constructModel(params)
 	if err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	// compile graph and construct machine
@@ -56,11 +56,11 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 	decoder := gob.NewDecoder(decodeDuf)
 	var weights []gorgonia.Value
 	if err = decoder.Decode(&weights); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	for i, weight := range weights {
 		if err = gorgonia.Let(learnables[i], weight); err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		}
 	}
 
@@ -70,20 +70,20 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 	// TODO: read data: yuanjia, cache
 	xVal, yVal, err := readMLData(h.sctx, params.batchSize, mlReq.Query)
 	if err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	// TODO: convert rows to xVal, yVal
 	if err = gorgonia.Let(x, xVal); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	if err = gorgonia.Let(y, yVal); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	// TODO: train the model with mlReq and return gradients: yifan, lanhai
 	if err = vm.RunAll(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	valueGrads := gorgonia.NodesToValueGrads(learnables)
