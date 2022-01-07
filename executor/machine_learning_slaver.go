@@ -62,7 +62,7 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 	}
 	hiddenUnits, err := string2IntSlice(strHiddenUnits)
 	if err != nil {
-		return nil, errors.New("hidden_units must be an array of integers like [2,3,5]")
+		return nil, errors.Errorf("invalid hidden_units=%v, it must be an array of integers like [2,3,5]", strHiddenUnits)
 	}
 	strBatchSize, ok := params["batch_size"]
 	if !ok {
