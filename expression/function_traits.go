@@ -30,6 +30,7 @@ var UnCacheableFunctions = map[string]struct{}{
 	ast.RowCount:     {},
 	ast.Version:      {},
 	ast.Like:         {},
+	"mlapply":        {},
 }
 
 // unFoldableFunctions stores functions which can not be folded duration constant folding stage.
@@ -49,6 +50,7 @@ var unFoldableFunctions = map[string]struct{}{
 	ast.NextVal:   {},
 	ast.LastVal:   {},
 	ast.SetVal:    {},
+	"mlapply":     {},
 }
 
 // DisableFoldFunctions stores functions which prevent child scope functions from being constant folded.
