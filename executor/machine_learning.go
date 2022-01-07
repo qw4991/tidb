@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"gorgonia.org/tensor"
 	"strings"
 
 	"github.com/pingcap/tidb/distsql"
@@ -157,7 +158,7 @@ func (ml *MLTrainModelExecutor) train(ctx context.Context, model, parameters str
 			return nil, err
 		}
 
-		gradValues := convertGradValues(avgGrads)
+		gradValues := convertGradValues(learnables, avgGrads)
 		if err := solver.Step(gradValues); err != nil {
 			return nil, err
 		}
@@ -179,13 +180,33 @@ func (ml *MLTrainModelExecutor) train(ctx context.Context, model, parameters str
 }
 
 func calAvgGrads(slaverGrads [][]gorgonia.Value) ([]gorgonia.Value, error) {
-	// TODO:
-	return slaverGrads[0], nil
+	values := make([]gorgonia.Value, 0, 1)
+	for j := 0; j < len(slaverGrads[0]); j++ {
+		grad := slaverGrads[0][j].(*tensor.Dense)
+		gradValue := grad.Data().([]float64)
+		nGradValue := make([]float64, 0, len(gradValue))
+		nGradValue = append(nGradValue, gradValue...)
+		for i := 1; i < len(slaverGrads); i++ {
+			grad = slaverGrads[i][j].(*tensor.Dense)
+			gradValue = grad.Data().([]float64)
+			for k := 0; k < len(nGradValue); k++ {
+				nGradValue[k] = nGradValue[k] + gradValue[k]
+			}
+		}
+		for k := 0; k < len(nGradValue); k++ {
+			nGradValue[k] = nGradValue[k] / float64(len(slaverGrads))
+		}
+		nGrad := tensor.NewDense(tensor.Float64, []int{len(nGradValue),1}, tensor.WithBacking(nGradValue))
+		values = append(values, nGrad)
+	}
+	return values, nil
 }
 
-func convertGradValues(values []gorgonia.Value) []gorgonia.ValueGrad {
-	// TODO:
-	return nil
+func convertGradValues(learnables []*gorgonia.Node, values []gorgonia.Value) []gorgonia.ValueGrad {
+	for i := 0; i < len(learnables); i++ {
+		learnables[i].SetGrad(values[i])
+	}
+	return gorgonia.NodesToValueGrads(learnables)
 }
 
 func (ml *MLTrainModelExecutor) constructMLReq(iter int, dataPartitionMap map[string]int, model, modelParameters string, modelData []byte) (*kv.Request, error) {
