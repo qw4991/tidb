@@ -15,6 +15,8 @@ import (
 	"github.com/pingcap/tidb/util/sqlexec"
 	"gorgonia.org/gorgonia"
 	"gorgonia.org/tensor"
+	"math"
+	"os"
 	"strings"
 )
 
@@ -70,14 +72,123 @@ func (ml *MLTrainModelExecutor) Next(ctx context.Context, req *chunk.Chunk) erro
 	}
 	model, paraData := sRows[0][0], sRows[0][1]
 
-	// start to training this model
-	modelData, err := ml.train(ctx, model, paraData)
+	var modelData []byte
+	if strings.Contains(strings.ToLower(ml.v.Model), "iris") {
+		modelData, err = ml.train4Iris(ctx)
+	} else {
+		// start to training this model
+		modelData, err = ml.train(ctx, model, paraData)
+	}
 	if err != nil {
 		return err
 	}
 
 	_, err = exec.ExecuteInternal(ctx, "update mysql.ml_models set model_data = %? where name = %?", modelData, ml.v.Model)
 	return err
+}
+
+func (ml *MLTrainModelExecutor) train4Iris(ctx context.Context) ([]byte, error) {
+	// read data for iris
+	// read from TiKV
+	exec := ml.ctx.(sqlexec.RestrictedSQLExecutor)
+	stmt, err := exec.ParseWithParamsInternal(context.Background(), ml.v.Query)
+	if err != nil {
+		return nil, fmt.Errorf("invalid query=%v, err=%v", ml.v.Query, err)
+	}
+	rows, _, err := exec.ExecRestrictedStmt(context.Background(), stmt)
+	if err != nil {
+		return nil, err
+	}
+
+	xT, yT, err := convert4Iris(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	g := gorgonia.NewGraph()
+	x := gorgonia.NodeFromAny(g, xT, gorgonia.WithName("x"))
+	y := gorgonia.NodeFromAny(g, yT, gorgonia.WithName("y"))
+	theta := gorgonia.NewVector(
+		g,
+		gorgonia.Float64,
+		gorgonia.WithName("theta"),
+		gorgonia.WithShape(xT.Shape()[1]),
+		gorgonia.WithInit(gorgonia.Uniform(0, 1)))
+	pred := must(gorgonia.Mul(x, theta))
+	// Saving the value for later use
+	var predicted gorgonia.Value
+	gorgonia.Read(pred, &predicted)
+	squaredError := must(gorgonia.Square(must(gorgonia.Sub(pred, y))))
+	cost := must(gorgonia.Mean(squaredError))
+	if _, err := gorgonia.Grad(cost, theta); err != nil {
+		logMaster("Failed to backpropagate: %v", err)
+		os.Exit(0)
+	}
+
+	solver := gorgonia.NewVanillaSolver(gorgonia.WithLearnRate(0.001))
+	model := []gorgonia.ValueGrad{theta}
+
+	machine := gorgonia.NewTapeMachine(g, gorgonia.BindDualValues(theta))
+	defer machine.Close()
+
+	iter := 100000
+	for i := 0; i < iter; i++ {
+		if err = machine.RunAll(); err != nil {
+			fmt.Printf("Error during iteration: %v: %v\n", i, err)
+			break
+		}
+
+		if err = solver.Step(model); err != nil {
+			fmt.Println(">>>>>> ", err)
+			os.Exit(0)
+		}
+		machine.Reset() // Reset is necessary in a loop like this
+
+		fmt.Printf("theta: %2.2f  Iter: %v Cost: %2.3f Accuracy: %2.2f \r",
+			theta.Value(),
+			i,
+			cost.Value(),
+			accuracy(predicted.Data().([]float64), y.Value().Data().([]float64)))
+	}
+
+	var encodeBuf bytes.Buffer
+	enc := gob.NewEncoder(&encodeBuf)
+	if err := enc.Encode(theta.Value()); err != nil {
+		return nil, err
+	}
+	return encodeBuf.Bytes(), nil
+}
+
+func must(n *gorgonia.Node, err error) *gorgonia.Node {
+	if err != nil {
+		panic(err)
+	}
+	return n
+}
+
+func accuracy(prediction, y []float64) float64 {
+	var ok float64
+	for i := 0; i < len(prediction); i++ {
+		if math.Round(prediction[i]-y[i]) == 0 {
+			ok += 1.0
+		}
+	}
+	return ok / float64(len(y))
+}
+
+func convert4Iris(rows []chunk.Row) (x *tensor.Dense, y *tensor.Dense, err error) {
+	n := len(rows)
+	xs := make([]float64, 0, n*4)
+	ys := make([]float64, 0, n)
+	for _, r := range rows {
+		x1, x2, x3, x4, y := r.GetFloat32(0), r.GetFloat32(1), r.GetFloat32(2), r.GetFloat32(3), r.GetInt64(4)
+		xs = append(xs, float64(x1), float64(x2), float64(x3), float64(x4))
+		ys = append(ys, float64(y))
+	}
+
+	x = tensor.New(tensor.WithShape(n, 4), tensor.WithBacking(xs))
+	y = tensor.New(tensor.WithShape(n), tensor.WithBacking(ys))
+	return
 }
 
 func (ml *MLTrainModelExecutor) train(ctx context.Context, model, parameters string) ([]byte, error) {
