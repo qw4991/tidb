@@ -74,7 +74,8 @@ func (ml *MLTrainModelExecutor) Next(ctx context.Context, req *chunk.Chunk) erro
 
 	var modelData []byte
 	if strings.Contains(strings.ToLower(ml.v.Model), "iris") {
-		modelData, err = ml.train4Iris(ctx)
+		//modelData, err = ml.train4Iris(ctx)
+		modelData, err = ml.train4Iris2(ctx)
 	} else {
 		// start to training this model
 		modelData, err = ml.train(ctx, model, paraData)
@@ -87,9 +88,99 @@ func (ml *MLTrainModelExecutor) Next(ctx context.Context, req *chunk.Chunk) erro
 	return err
 }
 
+func (ml *MLTrainModelExecutor) train4Iris2(ctx context.Context) ([]byte, error) {
+	g := gorgonia.NewGraph()
+	x := gorgonia.NewMatrix(g, gorgonia.Float64, gorgonia.WithShape(150, 4))
+	y := gorgonia.NewVector(g, gorgonia.Float64, gorgonia.WithShape(150))
+	theta := gorgonia.NewVector(
+		g,
+		gorgonia.Float64,
+		gorgonia.WithName("theta"),
+		gorgonia.WithShape(4),
+		gorgonia.WithInit(gorgonia.Uniform(0, 1)))
+
+	pred := must(gorgonia.Mul(x, theta))
+	// Saving the value for later use
+	var predicted gorgonia.Value
+	gorgonia.Read(pred, &predicted)
+	squaredError := must(gorgonia.Square(must(gorgonia.Sub(pred, y))))
+	cost := must(gorgonia.Mean(squaredError))
+	if _, err := gorgonia.Grad(cost, theta); err != nil {
+		logMaster("Failed to backpropagate: %v", err)
+		os.Exit(0)
+	}
+
+	solver := gorgonia.NewVanillaSolver(gorgonia.WithLearnRate(0.001))
+	model := []gorgonia.ValueGrad{theta}
+
+	machine := gorgonia.NewTapeMachine(g, gorgonia.BindDualValues(theta))
+	defer machine.Close()
+
+	var encodeBuf bytes.Buffer
+	enc := gob.NewEncoder(&encodeBuf)
+	if err := enc.Encode(theta.Value()); err != nil {
+		return nil, err
+	}
+	modelData := encodeBuf.Bytes()
+
+	iter := 10000
+	for i := 0; i < iter; i++ {
+		req, err := ml.constructMLReq(iter, nil, "DNNClassifier", "{}", modelData)
+		if err != nil {
+			return nil, err
+		}
+		resp := ml.ctx.GetClient().Send(ctx, req, ml.ctx.GetSessionVars().KVVars, ml.ctx.GetSessionVars().StmtCtx.MemTracker, false, nil)
+		defer resp.Close()
+
+		var slaverGrads []gorgonia.Value
+		for {
+			data, err := resp.Next(ctx)
+			if err != nil {
+				return nil, err
+			}
+			if data == nil { // no more data
+				break
+			}
+			decodeDuf := bytes.NewBuffer(data.GetData())
+			decoder := gob.NewDecoder(decodeDuf)
+			var grads *tensor.Dense
+			if err = decoder.Decode(&grads); err != nil {
+				return nil, err
+			}
+			slaverGrads = append(slaverGrads, grads)
+		}
+
+		var avgGrad gorgonia.Value
+		if len(slaverGrads) == 1 {
+			avgGrad = slaverGrads[0]
+		} else {
+			panic("TODO")
+		}
+
+		if err := theta.SetGrad(avgGrad); err != nil {
+			return nil, err
+		}
+
+		if err := solver.Step(model); err != nil {
+			return nil, err
+		}
+
+		encodeBuf.Reset()
+		enc := gob.NewEncoder(&encodeBuf)
+		if err := enc.Encode(theta.Value()); err != nil {
+			return nil, err
+		}
+		modelData = encodeBuf.Bytes()
+	}
+
+	enc = gob.NewEncoder(&encodeBuf)
+	if err := enc.Encode(theta.Value()); err != nil {
+		return nil, err
+	}
+	return encodeBuf.Bytes(), nil
+}
+
 func (ml *MLTrainModelExecutor) train4Iris(ctx context.Context) ([]byte, error) {
-	// read data for iris
-	// read from TiKV
 	exec := ml.ctx.(sqlexec.RestrictedSQLExecutor)
 	stmt, err := exec.ParseWithParamsInternal(context.Background(), ml.v.Query)
 	if err != nil {

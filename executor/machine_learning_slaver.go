@@ -27,6 +27,10 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 		return nil, errors.Trace(err)
 	}
 
+	if mlReq.CaseType == "iris" {
+		return h.HandleSlaverTraining4Iris(mlReq)
+	}
+
 	self := fmt.Sprintf("%v:%v %v", util.GetLocalIP(), config.GetGlobalConfig().Port, config.GetGlobalConfig().Store)
 	//logSlaver(self, "model data length %v", len(mlReq.ModelData))
 
