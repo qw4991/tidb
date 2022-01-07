@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"github.com/pingcap/tidb/util/logutil"
 	"gorgonia.org/gorgonia"
-	"strconv"
 	"strings"
 
 	"github.com/pingcap/tidb/distsql"
@@ -70,11 +69,11 @@ func (ml *MLTrainModelExecutor) Next(ctx context.Context, req *chunk.Chunk) erro
 	if len(sRows) == 0 {
 		return errors.New(fmt.Sprintf("model %v not found", ml.v.Model))
 	}
-	modelType, paraData := sRows[0][0], sRows[0][1]
-	fmt.Println(">>>> ", modelType, paraData)
+	model, paraData := sRows[0][0], sRows[0][1]
+	fmt.Println(">>>> ", model, paraData)
 
 	// start to training this model
-	modelData, err := ml.train(ctx, modelType, paraData)
+	modelData, err := ml.train(ctx, model, paraData)
 	if err != nil {
 		return err
 	}
@@ -83,7 +82,7 @@ func (ml *MLTrainModelExecutor) Next(ctx context.Context, req *chunk.Chunk) erro
 	return err
 }
 
-func (ml *MLTrainModelExecutor) train(ctx context.Context, modelType, parameters string) ([]byte, error) {
+func (ml *MLTrainModelExecutor) train(ctx context.Context, model, parameters string) ([]byte, error) {
 	// data partition
 	dataPartitionMap, err := ml.constructDataPartitionMap()
 	if err != nil {
@@ -91,109 +90,19 @@ func (ml *MLTrainModelExecutor) train(ctx context.Context, modelType, parameters
 	}
 
 	// Init the model according to parameters: yifan, lanhai
-	var params map[string]string
-	if err := json.Unmarshal([]byte(parameters), &params); err != nil {
+	// parse parameters
+	var paramMap map[string]string
+	if err := json.Unmarshal([]byte(parameters), &paramMap); err != nil {
 		return nil, errors.New("encounter error when decoding parameters")
 	}
-	strNumFeatures, ok := params["n_features"]
-	if !ok {
-		return nil, errors.New("n_features it not specified")
-	}
-	numFeatures, err := strconv.Atoi(strNumFeatures)
+	params, err := parseModelParams(model, paramMap)
 	if err != nil {
-		return nil, errors.New("n_features must be an integer")
-	}
-	strNumClasses, ok := params["n_classes"]
-	if !ok {
-		return nil, errors.New("n_classes is not specified")
-	}
-	numClasses, err := strconv.Atoi(strNumClasses)
-	if err != nil {
-		return nil, errors.New("n_classes must be an integer")
-	}
-	strHiddenUnits, ok := params["hidden_units"]
-	if !ok {
-		return nil, errors.New("hidden_units is not specified")
-	}
-	hiddenUnits, err := string2IntSlice(strHiddenUnits)
-	if err != nil {
-		return nil, errors.New("hidden_units must be an array of integers like [2,3,5]")
-	}
-	strBatchSize, ok := params["batch_size"]
-	if !ok {
-		return nil, errors.New("batch_size is not specified")
-	}
-	batchSize, err := strconv.Atoi(strBatchSize)
-	if err != nil {
-		return nil, errors.New("batch_size must be an integer")
-	}
-	strLearningRate, ok := params["learning_rate"]
-	if !ok {
-		return nil, errors.New("learning_rate is not specified")
-	}
-	learningRate, err := strconv.ParseFloat(strLearningRate, 64)
-	if err != nil {
-		return nil, errors.New("learning_size must be a float")
+		return nil, err
 	}
 	// TODO: loss function and optimizer/solver can also be added in params
-	logutil.BgLogger().Info(fmt.Sprintf("numFeatures = %v, numClasses = %v, hiddenUnits = %v, batchSize = %v, learningRate = %v", numFeatures, numClasses, hiddenUnits, batchSize, learningRate))
+	logutil.BgLogger().Info(fmt.Sprintf("numFeatures = %v, numClasses = %v, hiddenUnits = %v, batchSize = %v, learningRate = %v", params.numFeatures, params.numClasses, params.hiddenUnits, params.batchSize, params.learningRate))
 
-	// construct the computation graph
-	g := gorgonia.NewGraph()
-	x := gorgonia.NewMatrix(g, gorgonia.Float64, gorgonia.WithShape(batchSize, numFeatures), gorgonia.WithName("x"))
-	y := gorgonia.NewMatrix(g, gorgonia.Float64, gorgonia.WithShape(batchSize, numClasses), gorgonia.WithName("y"))
-	learnables := make([]*gorgonia.Node, 0, len(hiddenUnits)+1)
-	weightNum := 0
-	current := x
-	currentLen := x.Shape()[1]
-	for _, hiddenLen := range hiddenUnits {
-		w := gorgonia.NewMatrix(g, gorgonia.Float64, gorgonia.WithShape(currentLen, hiddenLen), gorgonia.WithName(fmt.Sprintf("w%v", weightNum)), gorgonia.WithInit(gorgonia.Gaussian(0, 0.1)))
-		weightNum++
-		learnables = append(learnables, w)
-		currentLen = hiddenLen
-		current, err = gorgonia.Mul(current, w)
-		if err != nil {
-			return nil, err
-		}
-		current, err = gorgonia.Rectify(current)
-		if err != nil {
-			return nil, err
-		}
-		current, err = gorgonia.Dropout(current, 0.5)
-		if err != nil {
-			return nil, err
-		}
-	}
-	w := gorgonia.NewVector(g, gorgonia.Float64, gorgonia.WithShape(currentLen, numClasses), gorgonia.WithName(fmt.Sprintf("w%v", weightNum)), gorgonia.WithInit(gorgonia.Gaussian(0, 0.1)))
-	weightNum++
-	learnables = append(learnables, w)
-	current, err = gorgonia.Mul(current, w)
-	if err != nil {
-		return nil, err
-	}
-	current, err = gorgonia.SoftMax(current)
-	if err != nil {
-		return nil, err
-	}
-
-	// cross entropy loss
-	current, err = gorgonia.Log(current)
-	if err != nil {
-		return nil, err
-	}
-	current, err = gorgonia.Neg(current)
-	if err != nil {
-		return nil, err
-	}
-	current, err = gorgonia.HadamardProd(current, y)
-	if err != nil {
-		return nil, err
-	}
-	loss, err := gorgonia.Mean(current)
-	if err != nil {
-		return nil, err
-	}
-	_, err = gorgonia.Grad(loss, learnables...)
+	g, _, _, learnables, err := constructModel(params)
 	if err != nil {
 		return nil, err
 	}
@@ -203,11 +112,11 @@ func (ml *MLTrainModelExecutor) train(ctx context.Context, modelType, parameters
 	if err != nil {
 		return nil, err
 	}
-	solver := gorgonia.NewVanillaSolver(gorgonia.WithLearnRate(learningRate))
+	solver := gorgonia.NewVanillaSolver(gorgonia.WithLearnRate(params.learningRate))
 
 	// TODO: init model data: yifan, lanhai
 	var modelData []byte
-	weights := make([]gorgonia.Value, 0, len(hiddenUnits)+1)
+	weights := make([]gorgonia.Value, 0, len(params.hiddenUnits)+1)
 	for _, node := range learnables {
 		weights = append(weights, node.Value())
 	}
@@ -219,7 +128,7 @@ func (ml *MLTrainModelExecutor) train(ctx context.Context, modelType, parameters
 	modelData = encodeBuf.Bytes()
 
 	for iter := 0; iter < 10000; iter++ {
-		req, err := ml.constructMLReq(iter, dataPartitionMap, modelType, parameters, modelData)
+		req, err := ml.constructMLReq(iter, dataPartitionMap, model, parameters, modelData)
 		if err != nil {
 			return nil, err
 		}
@@ -263,9 +172,9 @@ func (ml *MLTrainModelExecutor) train(ctx context.Context, modelType, parameters
 	return modelData, nil
 }
 
-func (ml *MLTrainModelExecutor) constructMLReq(iter int, dataPartitionMap map[string]int, modelType, modelParameters string, modelData []byte) (*kv.Request, error) {
+func (ml *MLTrainModelExecutor) constructMLReq(iter int, dataPartitionMap map[string]int, model, modelParameters string, modelData []byte) (*kv.Request, error) {
 	var builder distsql.RequestBuilder
-	mlReq := &MLModelReq{iter, dataPartitionMap, modelType, modelParameters, modelData, ""}
+	mlReq := &MLModelReq{iter, dataPartitionMap, model, modelParameters, modelData, ""}
 	reqData, err := json.Marshal(mlReq)
 	if err != nil {
 		return nil, err

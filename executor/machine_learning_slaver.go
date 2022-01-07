@@ -7,8 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/pingcap/errors"
@@ -33,112 +31,18 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 
 	// TODO: maybe model type can also be stored in params map.
 	// parse parameters
-	if mlReq.ModelType != "DNNClassifier" {
-		return nil, errors.New("unsupported model")
-	}
-	var params map[string]string
-	if err := json.Unmarshal([]byte(mlReq.Parameters), &params); err != nil {
+	var paramMap map[string]string
+	if err := json.Unmarshal([]byte(mlReq.Parameters), &paramMap); err != nil {
 		return nil, errors.New("encounter error when decoding parameters")
 	}
-	strNumFeatures, ok := params["n_features"]
-	if !ok {
-		return nil, errors.New("n_features it not specified")
-	}
-	numFeatures, err := strconv.Atoi(strNumFeatures)
+	params, err := parseModelParams(mlReq.ModelType, paramMap)
 	if err != nil {
-		return nil, errors.New("n_features must be an integer")
-	}
-	strNumClasses, ok := params["n_classes"]
-	if !ok {
-		return nil, errors.New("n_classes is not specified")
-	}
-	numClasses, err := strconv.Atoi(strNumClasses)
-	if err != nil {
-		return nil, errors.New("n_classes must be an integer")
-	}
-	strHiddenUnits, ok := params["hidden_units"]
-	if !ok {
-		return nil, errors.New("hidden_units is not specified")
-	}
-	hiddenUnits, err := string2IntSlice(strHiddenUnits)
-	if err != nil {
-		return nil, errors.Errorf("invalid hidden_units=%v, it must be an array of integers like [2,3,5], err=%v", strHiddenUnits, err)
-	}
-	strBatchSize, ok := params["batch_size"]
-	if !ok {
-		return nil, errors.New("batch_size is not specified")
-	}
-	batchSize, err := strconv.Atoi(strBatchSize)
-	if err != nil {
-		return nil, errors.New("batch_size must be an integer")
-	}
-	strLearningRate, ok := params["learning_rate"]
-	if !ok {
-		return nil, errors.New("learning_rate is not specified")
-	}
-	learningRate, err := strconv.ParseFloat(strLearningRate, 64)
-	if err != nil {
-		return nil, errors.New("learning_size must be a float")
+		return nil, err
 	}
 	// TODO: loss function and optimizer/solver can also be added in params
-	logutil.BgLogger().Info(fmt.Sprintf("numFeatures = %v, numClasses = %v, hiddenUnits = %v, batchSize = %v, learningRate = %v", numFeatures, numClasses, hiddenUnits, batchSize, learningRate))
+	logutil.BgLogger().Info(fmt.Sprintf("numFeatures = %v, numClasses = %v, hiddenUnits = %v, batchSize = %v, learningRate = %v", params.numFeatures, params.numClasses, params.hiddenUnits, params.batchSize, params.learningRate))
 
-	// construct the computation graph
-	g := gorgonia.NewGraph()
-	x := gorgonia.NewMatrix(g, gorgonia.Float64, gorgonia.WithShape(batchSize, numFeatures), gorgonia.WithName("x"))
-	y := gorgonia.NewMatrix(g, gorgonia.Float64, gorgonia.WithShape(batchSize, numClasses), gorgonia.WithName("y"))
-	learnables := make([]*gorgonia.Node, 0, len(hiddenUnits)+1)
-	weightNum := 0
-	current := x
-	currentLen := x.Shape()[1]
-	for _, hiddenLen := range hiddenUnits {
-		w := gorgonia.NewMatrix(g, gorgonia.Float64, gorgonia.WithShape(currentLen, hiddenLen), gorgonia.WithName(fmt.Sprintf("w%v", weightNum)), gorgonia.WithInit(gorgonia.Gaussian(0, 0.1)))
-		weightNum++
-		learnables = append(learnables, w)
-		currentLen = hiddenLen
-		current, err = gorgonia.Mul(current, w)
-		if err != nil {
-			return nil, err
-		}
-		current, err = gorgonia.Rectify(current)
-		if err != nil {
-			return nil, err
-		}
-		current, err = gorgonia.Dropout(current, 0.5)
-		if err != nil {
-			return nil, err
-		}
-	}
-	w := gorgonia.NewVector(g, gorgonia.Float64, gorgonia.WithShape(currentLen, numClasses), gorgonia.WithName(fmt.Sprintf("w%v", weightNum)), gorgonia.WithInit(gorgonia.Gaussian(0, 0.1)))
-	weightNum++
-	learnables = append(learnables, w)
-	current, err = gorgonia.Mul(current, w)
-	if err != nil {
-		return nil, err
-	}
-	current, err = gorgonia.SoftMax(current)
-	if err != nil {
-		return nil, err
-	}
-
-	// cross entropy loss
-	current, err = gorgonia.Log(current)
-	if err != nil {
-		return nil, err
-	}
-	current, err = gorgonia.Neg(current)
-	if err != nil {
-		return nil, err
-	}
-	current, err = gorgonia.HadamardProd(current, y)
-	if err != nil {
-		return nil, err
-	}
-	loss, err := gorgonia.Mean(current)
-	if err != nil {
-		return nil, err
-	}
-	_, err = gorgonia.Grad(loss, learnables...)
+	g, x, y, learnables, err := constructModel(params)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +68,7 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 	fmt.Println(">>>>>>>>>>> receive req >> ", self, mlReq)
 
 	// TODO: read data: yuanjia, cache
-	xVal, yVal, err := readMLData(h.sctx, batchSize, mlReq.Query)
+	xVal, yVal, err := readMLData(h.sctx, params.batchSize, mlReq.Query)
 	if err != nil {
 		return nil, err
 	}
@@ -199,22 +103,6 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 	}
 
 	return encodeBuf.Bytes(), nil
-}
-
-func string2IntSlice(str string) ([]int, error) {
-	// [1, 2, 3, 4]
-	str = strings.TrimSpace(str)
-	str = str[1 : len(str)-1]
-	strSlice := strings.Split(str, ",")
-	intSlice := make([]int, 0, len(strSlice))
-	for _, s := range strSlice {
-		i, err := strconv.Atoi(strings.TrimSpace(s))
-		if err != nil {
-			return nil, errors.Errorf("invalid intStr=%v", s)
-		}
-		intSlice = append(intSlice, i)
-	}
-	return intSlice, nil
 }
 
 type mlDataKey string
