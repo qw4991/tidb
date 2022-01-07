@@ -30,7 +30,7 @@ func (c *mlApplyFunctionClass) getFunction(ctx sessionctx.Context, args []Expres
 		return nil, err
 	}
 	if strings.Contains(strings.ToLower(modelName), "iris") {
-		bf, err := newBaseBuiltinFuncWithTp(ctx, "mlapply", args, types.ETReal, types.ETString, types.ETString, types.ETReal, types.ETReal, types.ETReal)
+		bf, err := newBaseBuiltinFuncWithTp(ctx, "mlapply", args, types.ETReal, types.ETString, types.ETReal, types.ETReal, types.ETReal, types.ETReal)
 		if err != nil {
 			return nil, nil
 		}
@@ -86,6 +86,8 @@ func (b *builtinMLApply4IrisSig) evalReal(row chunk.Row) (float64, bool, error) 
 	y, err := gorgonia.Mul(x, theta)
 
 	machine := gorgonia.NewTapeMachine(g)
+
+	fmt.Println(">>>>>>>>>>????????>>>>>>>>>> ", b.args, b.args[1], b.args[1].GetType())
 
 	values[0], _, err = b.args[1].EvalReal(b.ctx, row)
 	if err != nil {

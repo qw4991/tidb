@@ -151,8 +151,6 @@ func (ml *MLTrainModelExecutor) train4Iris(ctx context.Context) ([]byte, error) 
 			accuracy(predicted.Data().([]float64), y.Value().Data().([]float64)))
 	}
 
-	fmt.Println(">>>>>>>>>>>>>>>>> theta final >>> ", theta.Value())
-
 	var encodeBuf bytes.Buffer
 	enc := gob.NewEncoder(&encodeBuf)
 	if err := enc.Encode(theta.Value()); err != nil {
