@@ -2,10 +2,13 @@ package executor
 
 import (
 	"bytes"
+	"context"
 	"encoding/gob"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"github.com/pingcap/errors"
+	"github.com/pingcap/tidb/sessionctx"
+	"github.com/pingcap/tidb/util/sqlexec"
 	"math"
 	"strconv"
 	"strings"
@@ -161,7 +164,7 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 	fmt.Println(">>>>>>>>>>> receive req >> ", self, mlReq)
 
 	// TODO: read data: yuanjia, cache
-	xVal, yVal, err := readMLData(mlReq.Query)
+	xVal, yVal, err := readMLData(h.sctx, mlReq.Query)
 	if err != nil {
 		return nil, err
 	}
@@ -257,11 +260,42 @@ func init() {
 	cache = newMLDataCache(MB * 16)
 }
 
-func readMLData(query string) (x *tensor.Dense, y *tensor.Dense, err error) {
+func readMLData(sctx sessionctx.Context, query string) (x *tensor.Dense, y *tensor.Dense, err error) {
 	// read from the cache
 	if x, y, ok := cache.get(query); ok {
 		return x, y, nil
 	}
+	defer func() {
+		if err == nil {
+			cache.put(query, x, y)
+		}
+	}()
+
 	// read from TiKV
-	return nil, nil, nil
+	exec := sctx.(sqlexec.RestrictedSQLExecutor)
+	stmt, err := exec.ParseWithParamsInternal(context.Background(), query)
+	if err != nil {
+		return nil, nil, err
+	}
+	rows, fields, err := exec.ExecRestrictedStmt(context.Background(), stmt)
+	if err != nil {
+		return nil, nil, err
+	}
+	// TODO: only support 2 columns (img, label) now
+	if len(fields) != 2 && fields[0].ColumnAsName.L != "img" && fields[1].ColumnAsName.L != "label" {
+		return nil, nil, errors.Errorf("unsupported training query %v", query)
+	}
+
+	n := len(rows)
+	xVal, yVal := make([][]byte, 0, n), make([]float64, 0, n)
+	for _, r := range rows {
+		vx := r.GetBytes(0)
+		vy := r.GetFloat64(1)
+		xVal = append(xVal, vx)
+		yVal = append(yVal, vy)
+	}
+
+	y = tensor.New(tensor.WithShape(n), tensor.WithBacking(yVal))
+	// TODO: convert x, y to dense
+	return x, y, nil
 }
