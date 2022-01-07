@@ -2,10 +2,12 @@ package executor
 
 import (
 	"fmt"
-	"github.com/pingcap/errors"
-	"gorgonia.org/gorgonia"
 	"strconv"
 	"strings"
+
+	"github.com/pingcap/errors"
+	"github.com/pingcap/tidb/util/logutil"
+	"gorgonia.org/gorgonia"
 )
 
 type modelType int
@@ -90,7 +92,7 @@ func parseModelParams(model string, paramMap map[string]string) (modelParams, er
 	return res, nil
 }
 
-func constructModel(params modelParams) (g *gorgonia.ExprGraph, x, y *gorgonia.Node, learnables []*gorgonia.Node, err error) {
+func constructModel(params modelParams) (g *gorgonia.ExprGraph, x, y *gorgonia.Node, learnables []*gorgonia.Node, loss *gorgonia.Node, err error) {
 	// construct the computation graph
 	g = gorgonia.NewGraph()
 	x = gorgonia.NewMatrix(g, gorgonia.Float64, gorgonia.WithShape(params.batchSize, params.numFeatures), gorgonia.WithName("x"))
@@ -106,15 +108,15 @@ func constructModel(params modelParams) (g *gorgonia.ExprGraph, x, y *gorgonia.N
 		currentLen = hiddenLen
 		current, err = gorgonia.Mul(current, w)
 		if err != nil {
-			return nil, nil, nil, nil, errors.Trace(err)
+			return nil, nil, nil, nil, nil, errors.Trace(err)
 		}
 		current, err = gorgonia.Rectify(current)
 		if err != nil {
-			return nil, nil, nil, nil, errors.Trace(err)
+			return nil, nil, nil, nil, nil, errors.Trace(err)
 		}
 		current, err = gorgonia.Dropout(current, 0.5)
 		if err != nil {
-			return nil, nil, nil, nil, errors.Trace(err)
+			return nil, nil, nil, nil, nil, errors.Trace(err)
 		}
 	}
 	w := gorgonia.NewMatrix(g, gorgonia.Float64, gorgonia.WithShape(currentLen, params.numClasses), gorgonia.WithName(fmt.Sprintf("w%v", weightNum)), gorgonia.WithInit(gorgonia.Gaussian(0, 0.1)))
@@ -122,33 +124,41 @@ func constructModel(params modelParams) (g *gorgonia.ExprGraph, x, y *gorgonia.N
 	learnables = append(learnables, w)
 	current, err = gorgonia.Mul(current, w)
 	if err != nil {
-		return nil, nil, nil, nil, errors.Trace(err)
+		return nil, nil, nil, nil, nil, errors.Trace(err)
 	}
 	current, err = gorgonia.SoftMax(current)
 	if err != nil {
-		return nil, nil, nil, nil, errors.Trace(err)
+		return nil, nil, nil, nil, nil, errors.Trace(err)
 	}
 
 	// cross entropy loss
 	current, err = gorgonia.Log(current)
 	if err != nil {
-		return nil, nil, nil, nil, errors.Trace(err)
+		return nil, nil, nil, nil, nil, errors.Trace(err)
 	}
 	current, err = gorgonia.Neg(current)
 	if err != nil {
-		return nil, nil, nil, nil, errors.Trace(err)
+		return nil, nil, nil, nil, nil, errors.Trace(err)
 	}
 	current, err = gorgonia.HadamardProd(current, y)
 	if err != nil {
-		return nil, nil, nil, nil, errors.Trace(err)
+		return nil, nil, nil, nil, nil, errors.Trace(err)
 	}
-	loss, err := gorgonia.Mean(current)
+	loss, err = gorgonia.Mean(current)
 	if err != nil {
-		return nil, nil, nil, nil, errors.Trace(err)
+		return nil, nil, nil, nil, nil, errors.Trace(err)
 	}
 	_, err = gorgonia.Grad(loss, learnables...)
 	if err != nil {
-		return nil, nil, nil, nil, errors.Trace(err)
+		return nil, nil, nil, nil, nil, errors.Trace(err)
 	}
 	return
+}
+
+func logMaster(format string, vals ...interface{}) {
+	logutil.BgLogger().Info(fmt.Sprintf("[ML_Master] "+format, vals...))
+}
+
+func logSlaver(addr, format string, vals ...interface{}) {
+	logutil.BgLogger().Info(fmt.Sprintf("[ML_Slaver:"+addr+"] "+format, vals...))
 }

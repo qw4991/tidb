@@ -14,7 +14,6 @@ import (
 	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/util"
 	"github.com/pingcap/tidb/util/kvcache"
-	"github.com/pingcap/tidb/util/logutil"
 	"github.com/pingcap/tidb/util/sqlexec"
 	"gorgonia.org/gorgonia"
 	"gorgonia.org/tensor"
@@ -27,9 +26,9 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 		return nil, errors.Trace(err)
 	}
 
-	// TODO: init the model: yifan, lanhai
+	self := fmt.Sprintf("%v:%v %v", util.GetLocalIP(), config.GetGlobalConfig().Port, config.GetGlobalConfig().Store)
+	logSlaver(self, "model data length %v", len(mlReq.ModelData))
 
-	// TODO: maybe model type can also be stored in params map.
 	// parse parameters
 	var paramMap map[string]string
 	if err := json.Unmarshal([]byte(mlReq.Parameters), &paramMap); err != nil {
@@ -39,13 +38,15 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 	if err != nil {
 		return nil, errors.Trace(err)
 	}
-	// TODO: loss function and optimizer/solver can also be added in params
-	logutil.BgLogger().Info(fmt.Sprintf("numFeatures = %v, numClasses = %v, hiddenUnits = %v, batchSize = %v, learningRate = %v", params.numFeatures, params.numClasses, params.hiddenUnits, params.batchSize, params.learningRate))
 
-	g, x, y, learnables, err := constructModel(params)
+	g, x, y, learnables, loss, err := constructModel(params)
 	if err != nil {
 		return nil, errors.Trace(err)
 	}
+
+	// TODO: loss function and optimizer/solver can also be added in params
+	logSlaver(self, "numFeatures = %v, numClasses = %v, hiddenUnits = %v, batchSize = %v, learningRate = %v",
+		params.numFeatures, params.numClasses, params.hiddenUnits, params.batchSize, params.learningRate)
 
 	// compile graph and construct machine
 	prog, locMap, err := gorgonia.Compile(g)
@@ -63,9 +64,6 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 			return nil, errors.Trace(err)
 		}
 	}
-
-	self := fmt.Sprintf("%v:%v %v", util.GetLocalIP(), config.GetGlobalConfig().Port, config.GetGlobalConfig().Store)
-	fmt.Println(">>>>>>>>>>> receive req >> ", self, len(mlReq.ModelData))
 
 	// TODO: read data: yuanjia, cache
 	xVal, yVal, err := readMLData(h.sctx, params.batchSize, mlReq.Query)
@@ -85,6 +83,8 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 	if err = vm.RunAll(); err != nil {
 		return nil, errors.Trace(err)
 	}
+
+	logSlaver(self, "loss = %v", loss.Value().Data())
 
 	valueGrads := gorgonia.NodesToValueGrads(learnables)
 	grads := make([]gorgonia.Value, 0, len(valueGrads))

@@ -7,17 +7,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
-
 	"github.com/pingcap/tidb/distsql"
 	"github.com/pingcap/tidb/infoschema"
 	"github.com/pingcap/tidb/kv"
 	plannercore "github.com/pingcap/tidb/planner/core"
 	"github.com/pingcap/tidb/util/chunk"
-	"github.com/pingcap/tidb/util/logutil"
 	"github.com/pingcap/tidb/util/sqlexec"
 	"gorgonia.org/gorgonia"
 	"gorgonia.org/tensor"
+	"strings"
 )
 
 type MLCreateModelExecutor struct {
@@ -100,9 +98,9 @@ func (ml *MLTrainModelExecutor) train(ctx context.Context, model, parameters str
 		return nil, err
 	}
 	// TODO: loss function and optimizer/solver can also be added in params
-	logutil.BgLogger().Info(fmt.Sprintf("numFeatures = %v, numClasses = %v, hiddenUnits = %v, batchSize = %v, learningRate = %v", params.numFeatures, params.numClasses, params.hiddenUnits, params.batchSize, params.learningRate))
+	logMaster("numFeatures = %v, numClasses = %v, hiddenUnits = %v, batchSize = %v, learningRate = %v", params.numFeatures, params.numClasses, params.hiddenUnits, params.batchSize, params.learningRate)
 
-	g, _, _, learnables, err := constructModel(params)
+	g, _, _, learnables, _, err := constructModel(params)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +112,6 @@ func (ml *MLTrainModelExecutor) train(ctx context.Context, model, parameters str
 	}
 	solver := gorgonia.NewVanillaSolver(gorgonia.WithLearnRate(params.learningRate))
 
-	// TODO: init model data: yifan, lanhai
 	var modelData []byte
 	weights := make([]gorgonia.Value, 0, len(params.hiddenUnits)+1)
 	for _, node := range learnables {
@@ -166,7 +163,6 @@ func (ml *MLTrainModelExecutor) train(ctx context.Context, model, parameters str
 			return nil, err
 		}
 
-		// TODO: update the model data: yifan, lanhai
 		weights = weights[:0]
 		for _, node := range learnables {
 			weights = append(weights, node.Value())
