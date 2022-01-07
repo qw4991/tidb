@@ -6,11 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/util"
+	"github.com/pingcap/tidb/util/kvcache"
 	"github.com/pingcap/tidb/util/logutil"
 	"gorgonia.org/gorgonia"
 	"gorgonia.org/tensor"
@@ -158,7 +161,10 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 	fmt.Println(">>>>>>>>>>> receive req >> ", self, mlReq)
 
 	// TODO: read data: yuanjia, cache
-	xVal, yVal := readMLData(mlReq.Query)
+	xVal, yVal, err := readMLData(mlReq.Query)
+	if err != nil {
+		return nil, err
+	}
 
 	// TODO: convert rows to xVal, yVal
 	if err = gorgonia.Let(x, xVal); err != nil {
@@ -205,8 +211,57 @@ func string2IntSlice(str string) ([]int, error) {
 	return intSlice, nil
 }
 
-func readMLData(query string) (*tensor.Dense, *tensor.Dense) {
-	// TODO: yuanjia
+type mlDataKey string
 
-	return nil, nil
+func (k mlDataKey) Hash() []byte {
+	return []byte(k)
+}
+
+type mlDataVal struct {
+	x *tensor.Dense
+	y *tensor.Dense
+}
+
+type mlDataCache struct {
+	cache *kvcache.SimpleLRUCache
+	mu    sync.RWMutex
+}
+
+func newMLDataCache(cap uint) *mlDataCache {
+	return &mlDataCache{
+		cache: kvcache.NewSimpleLRUCache(cap, 0.1, math.MaxUint64),
+	}
+}
+
+func (c *mlDataCache) get(query string) (*tensor.Dense, *tensor.Dense, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	v, ok := c.cache.Get(mlDataKey(query))
+	if !ok {
+		return nil, nil, false
+	}
+	mlVal := v.(*mlDataVal)
+	return mlVal.x, mlVal.y, true
+}
+
+func (c *mlDataCache) put(query string, x, y *tensor.Dense) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.cache.Put(mlDataKey(query), &mlDataVal{x, y})
+}
+
+var cache *mlDataCache
+
+func init() {
+	const MB = 1 << 20
+	cache = newMLDataCache(MB * 16)
+}
+
+func readMLData(query string) (x *tensor.Dense, y *tensor.Dense, err error) {
+	// read from the cache
+	if x, y, ok := cache.get(query); ok {
+		return x, y, nil
+	}
+	// read from TiKV
+	return nil, nil, nil
 }
