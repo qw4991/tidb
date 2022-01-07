@@ -70,7 +70,6 @@ func (ml *MLTrainModelExecutor) Next(ctx context.Context, req *chunk.Chunk) erro
 		return errors.New(fmt.Sprintf("model %v not found", ml.v.Model))
 	}
 	model, paraData := sRows[0][0], sRows[0][1]
-	fmt.Println(">>>> ", model, paraData)
 
 	// start to training this model
 	modelData, err := ml.train(ctx, model, paraData)
@@ -174,7 +173,7 @@ func (ml *MLTrainModelExecutor) train(ctx context.Context, model, parameters str
 
 func (ml *MLTrainModelExecutor) constructMLReq(iter int, dataPartitionMap map[string]int, model, modelParameters string, modelData []byte) (*kv.Request, error) {
 	var builder distsql.RequestBuilder
-	mlReq := &MLModelReq{iter, dataPartitionMap, model, modelParameters, modelData, ""}
+	mlReq := &MLModelReq{iter, dataPartitionMap, model, modelParameters, modelData, ml.v.Query}
 	reqData, err := json.Marshal(mlReq)
 	if err != nil {
 		return nil, err

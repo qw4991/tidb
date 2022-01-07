@@ -166,11 +166,11 @@ func readMLData(sctx sessionctx.Context, batchSize int, query string) (x *tensor
 	exec := sctx.(sqlexec.RestrictedSQLExecutor)
 	stmt, err := exec.ParseWithParamsInternal(context.Background(), query)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Errorf("invalid query=%v, err=%v", query, err)
 	}
 	rows, fields, err := exec.ExecRestrictedStmt(context.Background(), stmt)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Trace(err)
 	}
 	// TODO: only support 2 columns (img, label) for minist-training data now
 	if len(fields) != 2 && fields[0].ColumnAsName.L != "img" && fields[1].ColumnAsName.L != "label" {
@@ -192,7 +192,7 @@ func readMLData(sctx sessionctx.Context, batchSize int, query string) (x *tensor
 
 	y = tensor.New(tensor.WithShape(batchSize), tensor.WithBacking(yVal))
 	if err := y.Reshape(y.Shape()[0]); err != nil { // reshape to a vector
-		return nil, nil, err
+		return nil, nil, errors.Trace(err)
 	}
 
 	// TODO: 28*28
