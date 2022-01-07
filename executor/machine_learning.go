@@ -71,7 +71,7 @@ func (ml *MLTrainModelExecutor) Next(ctx context.Context, req *chunk.Chunk) erro
 	if len(sRows) == 0 {
 		return errors.New(fmt.Sprintf("model %v not found", ml.v.Model))
 	}
-	model, paraData := sRows[0][0], sRows[0][1]
+	//model, paraData := sRows[0][0], sRows[0][1]
 
 	var modelData []byte
 	if strings.Contains(strings.ToLower(ml.v.Model), "iris") {
@@ -79,7 +79,7 @@ func (ml *MLTrainModelExecutor) Next(ctx context.Context, req *chunk.Chunk) erro
 		modelData, err = ml.train4Iris2(ctx)
 	} else {
 		// start to training this model
-		modelData, err = ml.train(ctx, model, paraData)
+		modelData, err = ml.train4Mnist(ctx)
 	}
 	if err != nil {
 		return err
