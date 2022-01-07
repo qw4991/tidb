@@ -181,23 +181,22 @@ func (ml *MLTrainModelExecutor) train(ctx context.Context, model, parameters str
 
 func calAvgGrads(slaverGrads [][]gorgonia.Value) ([]gorgonia.Value, error) {
 	values := make([]gorgonia.Value, 0, 1)
+	var err error = nil
 	for j := 0; j < len(slaverGrads[0]); j++ {
 		grad := slaverGrads[0][j].(*tensor.Dense)
-		gradValue := grad.Data().([]float64)
-		nGradValue := make([]float64, 0, len(gradValue))
-		nGradValue = append(nGradValue, gradValue...)
+		cGrad := grad.Clone()
 		for i := 1; i < len(slaverGrads); i++ {
 			grad = slaverGrads[i][j].(*tensor.Dense)
-			gradValue = grad.Data().([]float64)
-			for k := 0; k < len(nGradValue); k++ {
-				nGradValue[k] = nGradValue[k] + gradValue[k]
+			cGrad, err = tensor.Add(cGrad, grad.Clone())
+			if err != nil {
+				return nil, err
 			}
 		}
-		for k := 0; k < len(nGradValue); k++ {
-			nGradValue[k] = nGradValue[k] / float64(len(slaverGrads))
+		cGrad, err = tensor.Div(cGrad, float64(len(slaverGrads)))
+		if err != nil {
+			return nil, err
 		}
-		nGrad := tensor.NewDense(tensor.Float64, []int{len(nGradValue),1}, tensor.WithBacking(nGradValue))
-		values = append(values, nGrad)
+		values = append(values, cGrad.(*tensor.Dense))
 	}
 	return values, nil
 }
