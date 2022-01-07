@@ -2,7 +2,6 @@ package executor
 
 import (
 	"bytes"
-	"context"
 	"encoding/gob"
 	"encoding/json"
 	"errors"
@@ -13,7 +12,6 @@ import (
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/util"
 	"github.com/pingcap/tidb/util/logutil"
-	"github.com/pingcap/tidb/util/sqlexec"
 	"gorgonia.org/gorgonia"
 	"gorgonia.org/tensor"
 )
@@ -160,17 +158,9 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 	fmt.Println(">>>>>>>>>>> receive req >> ", self, mlReq)
 
 	// TODO: read data: yuanjia, cache
-	exec := h.sctx.(sqlexec.RestrictedSQLExecutor)
-	stmt, err := exec.ParseWithParamsInternal(context.Background(), mlReq.Query)
-	if err != nil {
-		return nil, err
-	}
-	rows, fields, err := exec.ExecRestrictedStmt(context.Background(), stmt)
-	if err != nil {
-		return nil, err
-	}
+	xVal, yVal := readMLData(mlReq.Query)
+
 	// TODO: convert rows to xVal, yVal
-	var xVal, yVal tensor.Tensor
 	if err = gorgonia.Let(x, xVal); err != nil {
 		return nil, err
 	}
@@ -213,4 +203,10 @@ func string2IntSlice(str string) ([]int, error) {
 		intSlice = append(intSlice, i)
 	}
 	return intSlice, nil
+}
+
+func readMLData(query string) (*tensor.Dense, *tensor.Dense) {
+	// TODO: yuanjia
+
+	return nil, nil
 }
