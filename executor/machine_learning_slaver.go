@@ -164,7 +164,7 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 	fmt.Println(">>>>>>>>>>> receive req >> ", self, mlReq)
 
 	// TODO: read data: yuanjia, cache
-	xVal, yVal, err := readMLData(h.sctx, mlReq.Query)
+	xVal, yVal, err := readMLData(h.sctx, batchSize, mlReq.Query)
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +263,7 @@ func init() {
 	cache = newMLDataCache(MB * 16)
 }
 
-func readMLData(sctx sessionctx.Context, query string) (x *tensor.Dense, y *tensor.Dense, err error) {
+func readMLData(sctx sessionctx.Context, batchSize int, query string) (x *tensor.Dense, y *tensor.Dense, err error) {
 	// read from the cache
 	if x, y, ok := cache.get(query); ok {
 		return x, y, nil
@@ -296,14 +296,18 @@ func readMLData(sctx sessionctx.Context, query string) (x *tensor.Dense, y *tens
 		vy := r.GetFloat64(1)
 		xVal = append(xVal, vx...)
 		yVal = append(yVal, vy)
+
+		if len(yVal) == batchSize {
+			break
+		}
 	}
 
-	y = tensor.New(tensor.WithShape(n), tensor.WithBacking(yVal))
+	y = tensor.New(tensor.WithShape(batchSize), tensor.WithBacking(yVal))
 	if err := y.Reshape(y.Shape()[0]); err != nil { // reshape to a vector
 		return nil, nil, err
 	}
 
 	// TODO: 28*28
-	x = tensor.New(tensor.WithShape(n, 28*28), tensor.WithBacking(xVal))
+	x = tensor.New(tensor.WithShape(batchSize, 28*28), tensor.WithBacking(xVal))
 	return x, y, nil
 }
