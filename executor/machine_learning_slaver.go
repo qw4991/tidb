@@ -40,31 +40,31 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 		return nil, errors.Trace(err)
 	}
 
-	g, x, y, learnables, loss, err := constructModel(params)
+	g, x, y, learnables, loss, err := constructModel2(params)
 	if err != nil {
 		return nil, errors.Trace(err)
 	}
 
 	// TODO: loss function and optimizer/solver can also be added in params
-	logSlaver(self, "numFeatures = %v, numClasses = %v, hiddenUnits = %v, batchSize = %v, learningRate = %v",
-		params.numFeatures, params.numClasses, params.hiddenUnits, params.batchSize, params.learningRate)
+	//logSlaver(self, "numFeatures = %v, numClasses = %v, hiddenUnits = %v, batchSize = %v, learningRate = %v",
+	//	params.numFeatures, params.numClasses, params.hiddenUnits, params.batchSize, params.learningRate)
 
 	// compile graph and construct machine
 	prog, locMap, err := gorgonia.Compile(g)
 	vm := gorgonia.NewTapeMachine(g, gorgonia.WithPrecompiled(prog, locMap), gorgonia.BindDualValues(learnables...))
 
 	// decode weights from mlReq.ModelData and assign them to learnables
-	decodeDuf := bytes.NewBuffer(mlReq.ModelData)
-	decoder := gob.NewDecoder(decodeDuf)
-	var weights []gorgonia.Value
-	if err = decoder.Decode(&weights); err != nil {
-		return nil, errors.Trace(err)
-	}
-	for i, weight := range weights {
-		if err = gorgonia.Let(learnables[i], weight); err != nil {
-			return nil, errors.Trace(err)
-		}
-	}
+	//decodeDuf := bytes.NewBuffer(mlReq.ModelData)
+	//decoder := gob.NewDecoder(decodeDuf)
+	//var weights []gorgonia.Value
+	//if err = decoder.Decode(&weights); err != nil {
+	//	return nil, errors.Trace(err)
+	//}
+	//for i, weight := range weights {
+	//	if err = gorgonia.Let(learnables[i], weight); err != nil {
+	//		return nil, errors.Trace(err)
+	//	}
+	//}
 
 	// TODO: read data: yuanjia, cache
 	xVal, yVal, err := readMLData(h.sctx, params.batchSize, mlReq.Query)
@@ -81,7 +81,8 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 	}
 
 	// TODO: for debug <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-	solver := gorgonia.NewVanillaSolver(gorgonia.WithLearnRate(params.learningRate))
+	//solver := gorgonia.NewVanillaSolver(gorgonia.WithLearnRate(params.learningRate))
+	solver := gorgonia.NewRMSPropSolver(gorgonia.WithBatchSize(float64(params.batchSize)))
 	for i := 0; i < 100; i++ {
 		if err = vm.RunAll(); err != nil {
 			return nil, errors.Trace(err)
@@ -219,6 +220,6 @@ func readMLData(sctx sessionctx.Context, batchSize int, query string) (x *tensor
 
 	y = tensor.New(tensor.WithShape(batchSize, 10), tensor.WithBacking(yVal))
 	// TODO: 28*28
-	x = tensor.New(tensor.WithShape(batchSize, 28*28), tensor.WithBacking(xVal))
+	x = tensor.New(tensor.WithShape(batchSize, 1, 28, 28), tensor.WithBacking(xVal))
 	return x, y, nil
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/pingcap/errors"
 	"github.com/pingcap/tidb/util/logutil"
 	"gorgonia.org/gorgonia"
+	"gorgonia.org/tensor"
 )
 
 type modelType int
@@ -161,4 +162,140 @@ func logMaster(format string, vals ...interface{}) {
 
 func logSlaver(addr, format string, vals ...interface{}) {
 	logutil.BgLogger().Info(fmt.Sprintf("[ML_Slaver:"+addr+"] "+format, vals...))
+}
+
+var dt tensor.Dtype
+
+func init() {
+	dt = tensor.Float64
+}
+
+	type convnet struct {
+	g                  *gorgonia.ExprGraph
+	w0, w1, w2, w3, w4 *gorgonia.Node // weights. the number at the back indicates which layer it's used for
+	d0, d1, d2, d3     float64 // dropout probabilities
+
+	out *gorgonia.Node
+}
+
+func newConvNet(g *gorgonia.ExprGraph) *convnet {
+	w0 := gorgonia.NewTensor(g, dt, 4, gorgonia.WithShape(32, 1, 3, 3), gorgonia.WithName("w0"), gorgonia.WithInit(gorgonia.GlorotN(1.0)))
+	w1 := gorgonia.NewTensor(g, dt, 4, gorgonia.WithShape(64, 32, 3, 3), gorgonia.WithName("w1"), gorgonia.WithInit(gorgonia.GlorotN(1.0)))
+	w2 := gorgonia.NewTensor(g, dt, 4, gorgonia.WithShape(128, 64, 3, 3), gorgonia.WithName("w2"), gorgonia.WithInit(gorgonia.GlorotN(1.0)))
+	w3 := gorgonia.NewMatrix(g, dt, gorgonia.WithShape(128*3*3, 625), gorgonia.WithName("w3"), gorgonia.WithInit(gorgonia.GlorotN(1.0)))
+	w4 := gorgonia.NewMatrix(g, dt, gorgonia.WithShape(625, 10), gorgonia.WithName("w4"), gorgonia.WithInit(gorgonia.GlorotN(1.0)))
+	return &convnet{
+		g:  g,
+		w0: w0,
+		w1: w1,
+		w2: w2,
+		w3: w3,
+		w4: w4,
+
+		d0: 0.2,
+		d1: 0.2,
+		d2: 0.2,
+		d3: 0.55,
+	}
+}
+
+func (m *convnet) learnables() gorgonia.Nodes {
+	return gorgonia.Nodes{m.w0, m.w1, m.w2, m.w3, m.w4}
+}
+
+// This function is particularly verbose for educational reasons. In reality, you'd wrap up the layers within a layer struct type and perform per-layer activations
+func (m *convnet) fwd(x *gorgonia.Node) (err error) {
+	var c0, c1, c2, fc *gorgonia.Node
+	var a0, a1, a2, a3 *gorgonia.Node
+	var p0, p1, p2 *gorgonia.Node
+	var l0, l1, l2, l3 *gorgonia.Node
+
+	// LAYER 0
+	// here we convolve with stride = (1, 1) and padding = (1, 1),
+	// which is your bog standard convolution for convnet
+	if c0, err = gorgonia.Conv2d(x, m.w0, tensor.Shape{3, 3}, []int{1, 1}, []int{1, 1}, []int{1, 1}); err != nil {
+		return errors.Wrap(err, "Layer 0 Convolution failed")
+	}
+	if a0, err = gorgonia.Rectify(c0); err != nil {
+		return errors.Wrap(err, "Layer 0 activation failed")
+	}
+	if p0, err = gorgonia.MaxPool2D(a0, tensor.Shape{2, 2}, []int{0, 0}, []int{2, 2}); err != nil {
+		return errors.Wrap(err, "Layer 0 Maxpooling failed")
+	}
+	if l0, err = gorgonia.Dropout(p0, m.d0); err != nil {
+		return errors.Wrap(err, "Unable to apply a dropout")
+	}
+
+	// Layer 1
+	if c1, err = gorgonia.Conv2d(l0, m.w1, tensor.Shape{3, 3}, []int{1, 1}, []int{1, 1}, []int{1, 1}); err != nil {
+		return errors.Wrap(err, "Layer 1 Convolution failed")
+	}
+	if a1, err = gorgonia.Rectify(c1); err != nil {
+		return errors.Wrap(err, "Layer 1 activation failed")
+	}
+	if p1, err = gorgonia.MaxPool2D(a1, tensor.Shape{2, 2}, []int{0, 0}, []int{2, 2}); err != nil {
+		return errors.Wrap(err, "Layer 1 Maxpooling failed")
+	}
+	if l1, err = gorgonia.Dropout(p1, m.d1); err != nil {
+		return errors.Wrap(err, "Unable to apply a dropout to layer 1")
+	}
+
+	// Layer 2
+	if c2, err = gorgonia.Conv2d(l1, m.w2, tensor.Shape{3, 3}, []int{1, 1}, []int{1, 1}, []int{1, 1}); err != nil {
+		return errors.Wrap(err, "Layer 2 Convolution failed")
+	}
+	if a2, err = gorgonia.Rectify(c2); err != nil {
+		return errors.Wrap(err, "Layer 2 activation failed")
+	}
+	if p2, err = gorgonia.MaxPool2D(a2, tensor.Shape{2, 2}, []int{0, 0}, []int{2, 2}); err != nil {
+		return errors.Wrap(err, "Layer 2 Maxpooling failed")
+	}
+
+	var r2 *gorgonia.Node
+	b, c, h, w := p2.Shape()[0], p2.Shape()[1], p2.Shape()[2], p2.Shape()[3]
+	if r2, err = gorgonia.Reshape(p2, tensor.Shape{b, c * h * w}); err != nil {
+		return errors.Wrap(err, "Unable to reshape layer 2")
+	}
+	if l2, err = gorgonia.Dropout(r2, m.d2); err != nil {
+		return errors.Wrap(err, "Unable to apply a dropout on layer 2")
+	}
+
+	// Layer 3
+	if fc, err = gorgonia.Mul(l2, m.w3); err != nil {
+		return errors.Wrapf(err, "Unable to multiply l2 and w3")
+	}
+	if a3, err = gorgonia.Rectify(fc); err != nil {
+		return errors.Wrapf(err, "Unable to activate fc")
+	}
+	if l3, err = gorgonia.Dropout(a3, m.d3); err != nil {
+		return errors.Wrapf(err, "Unable to apply a dropout on layer 3")
+	}
+
+	// output decode
+	var out *gorgonia.Node
+	if out, err = gorgonia.Mul(l3, m.w4); err != nil {
+		return errors.Wrapf(err, "Unable to multiply l3 and w4")
+	}
+	m.out, err = gorgonia.SoftMax(out)
+	return
+}
+
+
+func constructModel2(params modelParams) (g *gorgonia.ExprGraph, x, y *gorgonia.Node, learnables []*gorgonia.Node, loss *gorgonia.Node, err error) {
+	g = gorgonia.NewGraph()
+	x = gorgonia.NewTensor(g, dt, 4, gorgonia.WithShape(params.batchSize, 1, 28, 28), gorgonia.WithName("x"))
+	y = gorgonia.NewMatrix(g, dt, gorgonia.WithShape(params.batchSize, 10), gorgonia.WithName("y"))
+	m := newConvNet(g)
+	if err = m.fwd(x); err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+
+	losses := gorgonia.Must(gorgonia.Log(gorgonia.Must(gorgonia.HadamardProd(m.out, y))))
+	loss = gorgonia.Must(gorgonia.Mean(losses))
+	loss = gorgonia.Must(gorgonia.Neg(loss))
+
+	if _, err = gorgonia.Grad(loss, m.learnables()...); err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+	return
 }
