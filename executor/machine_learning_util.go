@@ -276,11 +276,12 @@ func (m *convnet) fwd(x *gorgonia.Node) (err error) {
 	}
 
 	// output decode
-	var out *gorgonia.Node
-	if out, err = gorgonia.Mul(l3, m.w4); err != nil {
-		return errors.Wrapf(err, "Unable to multiply l3 and w4")
-	}
-	m.out, err = gorgonia.SoftMax(out)
+	//var out *gorgonia.Node
+	//if out, err = gorgonia.Mul(l3, m.w4); err != nil {
+	//	return errors.Wrapf(err, "Unable to multiply l3 and w4")
+	//}
+	//m.out, err = gorgonia.SoftMax(out)
+	m.out, err = gorgonia.Mul(l3, m.w4)
 	return
 }
 

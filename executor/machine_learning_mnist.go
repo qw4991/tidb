@@ -8,6 +8,7 @@ import (
 	G "gorgonia.org/gorgonia"
 	"gorgonia.org/tensor"
 	"log"
+	"math"
 )
 
 // Image holds the pixel intensities of an image.
@@ -54,7 +55,7 @@ func (ml *MLTrainModelExecutor) train4Mnist(ctx context.Context) ([]byte, error)
 	//
 	// The 1 indicates that there is only one channel (MNIST data is black and white).
 	numExamples := inputs.Shape()[0]
-	bs := 50
+	bs := 100
 	// todo - check bs not 0
 
 	if err := inputs.Reshape(numExamples, 1, 28, 28); err != nil {
@@ -73,9 +74,12 @@ func (ml *MLTrainModelExecutor) train4Mnist(ctx context.Context) ([]byte, error)
 	// The losses that are not commented out is used to test the stabilization function of Gorgonia.
 	//losses := G.Must(G.HadamardProd(G.Must(G.Neg(G.Must(G.Log(m.out)))), y))
 
-	losses := G.Must(G.Log(G.Must(G.HadamardProd(m.out, y))))
-	cost := G.Must(G.Mean(losses))
-	cost = G.Must(G.Neg(cost))
+	//losses := G.Must(G.Log(G.Must(G.HadamardProd(m.out, y))))
+	//cost := G.Must(G.Mean(losses))
+	//cost = G.Must(G.Neg(cost))
+
+	squaredError := must(G.Square(must(G.Sub(m.out, y))))
+	cost := must(G.Mean(squaredError))
 
 	// we wanna track costs
 	var costVal G.Value
@@ -115,7 +119,7 @@ func (ml *MLTrainModelExecutor) train4Mnist(ctx context.Context) ([]byte, error)
 	batches := numExamples / bs
 	log.Printf("Batches %d", batches)
 
-	epochs := 10
+	epochs := 50
 	for i := 0; i < epochs; i++ {
 		fmt.Println("Epoch ", i)
 		for b := 0; b < batches; b++ {
@@ -148,9 +152,42 @@ func (ml *MLTrainModelExecutor) train4Mnist(ctx context.Context) ([]byte, error)
 			if err = solver.Step(G.NodesToValueGrads(m.learnables())); err != nil {
 				log.Fatalf("Failed to update nodes with gradients at epoch %d, batch %d. Error %v", i, b, err)
 			}
+
+			logMaster("Epoch %d | Batch %d | cost %v", i, b, costVal)
+			preds := make([]int, 0, bs)
+			data := m.out.Value().Data().([]float64)
+			//fmt.Printf("shape = %v", m.out.Shape())
+			for i := 0; i < bs; i++ {
+				idx := -1
+				for j := 0; j < 10; j++ {
+					if idx == -1 || math.Abs(data[i * 10 + j]) > math.Abs(data[i * 10 + idx]) {
+						idx = j
+					}
+				}
+				preds = append(preds, idx)
+			}
+			actuals := make([]int, 0, bs)
+			data = yVal.Data().([]float64)
+			//fmt.Printf("actual value = %v", data)
+			for i := 0; i < bs; i++ {
+				idx := -1
+				for j := 0; j < 10; j++ {
+					if idx == -1 || math.Abs(data[i * 10 + j]) > math.Abs(data[i * 10 + idx]) {
+						idx = j
+					}
+				}
+				actuals = append(actuals, idx)
+			}
+			cnt := 0
+			for i := 0; i < bs; i++ {
+				if preds[i] == actuals[i] {
+					cnt++
+				}
+			}
+			logMaster("right = %v, acc = %v", cnt, float64(cnt) / float64(bs))
+
 			vm.Reset()
 		}
-		log.Printf("Epoch %d | cost %v", i, costVal)
 	}
 
 	return nil, nil
