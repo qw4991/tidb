@@ -149,10 +149,14 @@ func (ml *MLTrainModelExecutor) train(ctx context.Context, model, parameters str
 				return nil, err
 			}
 			for i, weight := range grads {
-				learnables[i].SetGrad(weight)
+				if err := learnables[i].SetGrad(weight); err != nil {
+					return nil, err
+				}
 			}
 			vg := gorgonia.NodesToValueGrads(learnables)
-			solver.Step(vg)
+			if err := solver.Step(vg); err != nil {
+				return nil, err
+			}
 		}
 
 		// TODO: update the model data: yifan, lanhai
