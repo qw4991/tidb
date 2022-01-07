@@ -281,7 +281,7 @@ func readMLData(sctx sessionctx.Context, query string) (x *tensor.Dense, y *tens
 	if err != nil {
 		return nil, nil, err
 	}
-	// TODO: only support 2 columns (img, label) now
+	// TODO: only support 2 columns (img, label) for minist-training data now
 	if len(fields) != 2 && fields[0].ColumnAsName.L != "img" && fields[1].ColumnAsName.L != "label" {
 		return nil, nil, errors.Errorf("unsupported training query %v", query)
 	}
@@ -296,6 +296,9 @@ func readMLData(sctx sessionctx.Context, query string) (x *tensor.Dense, y *tens
 	}
 
 	y = tensor.New(tensor.WithShape(n), tensor.WithBacking(yVal))
-	// TODO: convert x, y to dense
+	if err := y.Reshape(y.Shape()[0]); err != nil { // reshape to a vector
+		return nil, nil, err
+	}
+	x = tensor.New(tensor.WithShape(n), tensor.WithBacking(xVal))
 	return x, y, nil
 }
