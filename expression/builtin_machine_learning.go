@@ -63,6 +63,9 @@ func (b *builtinMLApplySig) evalReal(row chunk.Row) (float64, bool, error) {
 			return 0, false, fmt.Errorf("model %v not found", modelName)
 		}
 		modelData := rows[0].GetBytes(0)
+		fmt.Println(">>>>>>>>>>>>>> ", len(modelData))
+
+		// TODO: construct the model
 
 		b.inited = true
 	}
@@ -72,6 +75,7 @@ func (b *builtinMLApplySig) evalReal(row chunk.Row) (float64, bool, error) {
 		return 0, false, err
 	}
 	fmt.Println(">>>>>>>>>>>>>> ", len(data))
+	// TODO: convert data to X
 
 	return 0, false, nil
 }
