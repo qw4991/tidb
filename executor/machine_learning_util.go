@@ -117,7 +117,7 @@ func constructModel(params modelParams) (g *gorgonia.ExprGraph, x, y *gorgonia.N
 			return nil, nil, nil, nil, err
 		}
 	}
-	w := gorgonia.NewVector(g, gorgonia.Float64, gorgonia.WithShape(currentLen, params.numClasses), gorgonia.WithName(fmt.Sprintf("w%v", weightNum)), gorgonia.WithInit(gorgonia.Gaussian(0, 0.1)))
+	w := gorgonia.NewMatrix(g, gorgonia.Float64, gorgonia.WithShape(currentLen, params.numClasses), gorgonia.WithName(fmt.Sprintf("w%v", weightNum)), gorgonia.WithInit(gorgonia.Gaussian(0, 0.1)))
 	weightNum++
 	learnables = append(learnables, w)
 	current, err = gorgonia.Mul(current, w)
