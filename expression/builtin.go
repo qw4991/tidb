@@ -579,6 +579,7 @@ var funcs = map[string]functionClass{
 	ast.Interval: &intervalFunctionClass{baseFunctionClass{ast.Interval, 2, -1}},
 
 	// math functions
+	"mlapply":    &mlApplyFunctionClass{baseFunctionClass{"mlapply", 2, 2}},
 	ast.Abs:      &absFunctionClass{baseFunctionClass{ast.Abs, 1, 1}},
 	ast.Acos:     &acosFunctionClass{baseFunctionClass{ast.Acos, 1, 1}},
 	ast.Asin:     &asinFunctionClass{baseFunctionClass{ast.Asin, 1, 1}},
