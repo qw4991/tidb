@@ -80,13 +80,12 @@ func (b *builtinMLApply4IrisSig) evalReal(row chunk.Row) (float64, bool, error) 
 
 	g := gorgonia.NewGraph()
 	theta := gorgonia.NodeFromAny(g, thetaT, gorgonia.WithName("theta"))
-	values := make([]float64, 5)
+	values := make([]float64, 4)
 	xT := tensor.New(tensor.WithBacking(values))
 	x := gorgonia.NodeFromAny(g, xT, gorgonia.WithName("x"))
 	y, err := gorgonia.Mul(x, theta)
 
 	machine := gorgonia.NewTapeMachine(g)
-	values[4] = 1.0
 
 	values[0], _, err = b.args[1].EvalReal(b.ctx, row)
 	if err != nil {

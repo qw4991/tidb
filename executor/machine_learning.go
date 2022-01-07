@@ -131,7 +131,7 @@ func (ml *MLTrainModelExecutor) train4Iris(ctx context.Context) ([]byte, error) 
 	machine := gorgonia.NewTapeMachine(g, gorgonia.BindDualValues(theta))
 	defer machine.Close()
 
-	iter := 100000
+	iter := 10000
 	for i := 0; i < iter; i++ {
 		if err = machine.RunAll(); err != nil {
 			fmt.Printf("Error during iteration: %v: %v\n", i, err)
@@ -150,6 +150,8 @@ func (ml *MLTrainModelExecutor) train4Iris(ctx context.Context) ([]byte, error) 
 			cost.Value(),
 			accuracy(predicted.Data().([]float64), y.Value().Data().([]float64)))
 	}
+
+	fmt.Println(">>>>>>>>>>>>>>>>> theta final >>> ", theta.Value())
 
 	var encodeBuf bytes.Buffer
 	enc := gob.NewEncoder(&encodeBuf)
