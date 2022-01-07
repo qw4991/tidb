@@ -98,7 +98,7 @@ func (ml *MLTrainModelExecutor) train(ctx context.Context, model, parameters str
 		return nil, err
 	}
 	// TODO: loss function and optimizer/solver can also be added in params
-	logMaster("numFeatures = %v, numClasses = %v, hiddenUnits = %v, batchSize = %v, learningRate = %v", params.numFeatures, params.numClasses, params.hiddenUnits, params.batchSize, params.learningRate)
+	//logMaster("numFeatures = %v, numClasses = %v, hiddenUnits = %v, batchSize = %v, learningRate = %v", params.numFeatures, params.numClasses, params.hiddenUnits, params.batchSize, params.learningRate)
 
 	g, _, _, learnables, _, err := constructModel(params)
 	if err != nil {

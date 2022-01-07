@@ -28,7 +28,7 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 	}
 
 	self := fmt.Sprintf("%v:%v %v", util.GetLocalIP(), config.GetGlobalConfig().Port, config.GetGlobalConfig().Store)
-	logSlaver(self, "model data length %v", len(mlReq.ModelData))
+	//logSlaver(self, "model data length %v", len(mlReq.ModelData))
 
 	// parse parameters
 	var paramMap map[string]string
@@ -193,23 +193,36 @@ func readMLData(sctx sessionctx.Context, batchSize int, query string) (x *tensor
 		return nil, nil, errors.Trace(err)
 	}
 	// TODO: only support 2 columns (img, label) for minist-training data now
-	if len(fields) != 2 && fields[0].ColumnAsName.L != "img" && fields[1].ColumnAsName.L != "label" {
-		return nil, nil, errors.Errorf("unsupported training query %v", query)
-	}
+	//if len(fields) != 2 && fields[0].ColumnAsName.L != "img" && fields[1].ColumnAsName.L != "label" {
+	//	return nil, nil, errors.Errorf("unsupported training query %v", query)
+	//}
 
 	n := len(rows)
-	xVal, yVal := make([]float64, 0, n*28*28), make([]float64, 0, n*10)
+	ac := len(fields)
+	vl := 28*28
+	yl := 10
+	if ac > 2 {
+		vl = 4
+		yl = 3
+	}
+	xVal, yVal := make([]float64, 0, n*vl), make([]float64, 0, n*yl)
 	for i, r := range rows {
 		if i == batchSize {
 			break
 		}
-		vx := r.GetBytes(0)
-		vy := r.GetFloat64(1)
-		for _, v := range vx {
-			xVal = append(xVal, float64(v))
+		if ac == 2 {
+			vx := r.GetBytes(0)
+			for _, v := range vx {
+				xVal = append(xVal, float64(v))
+			}
+		} else {
+			for j := 0; j < ac-1; j++ {
+				xVal = append(xVal, r.GetFloat64(j))
+			}
 		}
+		vy := r.GetFloat64(ac-1)
 		label := int(vy)
-		for j := 0; j < 10; j++ {
+		for j := 0; j < yl; j++ {
 			if j == label {
 				yVal = append(yVal, 0.9)
 			} else {
@@ -218,8 +231,8 @@ func readMLData(sctx sessionctx.Context, batchSize int, query string) (x *tensor
 		}
 	}
 
-	y = tensor.New(tensor.WithShape(batchSize, 10), tensor.WithBacking(yVal))
+	y = tensor.New(tensor.WithShape(batchSize, yl), tensor.WithBacking(yVal))
 	// TODO: 28*28
-	x = tensor.New(tensor.WithShape(batchSize, 1, 28, 28), tensor.WithBacking(xVal))
+	x = tensor.New(tensor.WithShape(batchSize, vl), tensor.WithBacking(xVal))
 	return x, y, nil
 }
