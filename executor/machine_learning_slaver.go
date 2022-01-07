@@ -290,11 +290,11 @@ func readMLData(sctx sessionctx.Context, query string) (x *tensor.Dense, y *tens
 	}
 
 	n := len(rows)
-	xVal, yVal := make([][]byte, 0, n), make([]float64, 0, n)
+	xVal, yVal := make([]byte, 0, n*28*28), make([]float64, 0, n)
 	for _, r := range rows {
 		vx := r.GetBytes(0)
 		vy := r.GetFloat64(1)
-		xVal = append(xVal, vx)
+		xVal = append(xVal, vx...)
 		yVal = append(yVal, vy)
 	}
 
@@ -302,6 +302,8 @@ func readMLData(sctx sessionctx.Context, query string) (x *tensor.Dense, y *tens
 	if err := y.Reshape(y.Shape()[0]); err != nil { // reshape to a vector
 		return nil, nil, err
 	}
-	x = tensor.New(tensor.WithShape(n), tensor.WithBacking(xVal))
+
+	// TODO: 28*28
+	x = tensor.New(tensor.WithShape(n, 28*28), tensor.WithBacking(xVal))
 	return x, y, nil
 }
