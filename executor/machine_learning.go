@@ -211,7 +211,13 @@ func convertGradValues(learnables []*gorgonia.Node, values []gorgonia.Value) ([]
 
 func (ml *MLTrainModelExecutor) constructMLReq(iter int, dataPartitionMap map[string]int, model, modelParameters string, modelData []byte) (*kv.Request, error) {
 	var builder distsql.RequestBuilder
-	mlReq := &MLModelReq{iter, dataPartitionMap, model, modelParameters, modelData, ml.v.Query}
+
+	caseType := ""
+	if strings.Contains(strings.ToLower(ml.v.Model), "iris") {
+		caseType = "iris"
+	}
+
+	mlReq := &MLModelReq{iter, dataPartitionMap, caseType, model, modelParameters, modelData, ml.v.Query}
 	reqData, err := json.Marshal(mlReq)
 	if err != nil {
 		return nil, err
@@ -242,6 +248,7 @@ func (ml *MLTrainModelExecutor) constructDataPartitionMap() (map[string]int, err
 type MLModelReq struct {
 	Iter             int
 	DataPartitionMap map[string]int
+	CaseType         string
 	ModelType        string
 	Parameters       string // json format of map[string]string
 	ModelData        []byte // encoding from []gorgonia.Value

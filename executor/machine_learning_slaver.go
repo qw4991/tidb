@@ -41,7 +41,17 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 		return nil, errors.Trace(err)
 	}
 
-	g, x, y, learnables, loss, err := constructModel2(params)
+	var (
+		g          *gorgonia.ExprGraph
+		x, y       *gorgonia.Node
+		learnables []*gorgonia.Node
+		loss       *gorgonia.Node
+	)
+
+	if mlReq.CaseType == "iris" {
+		g, x, y, learnables, loss, err = constructModel4Iris()
+	}
+	g, x, y, learnables, loss, err = constructModel2(params)
 	if err != nil {
 		return nil, errors.Trace(err)
 	}
@@ -68,7 +78,7 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 	//}
 
 	// TODO: read data: yuanjia, cache
-	xVal, yVal, err := readMLData(h.sctx, params.batchSize, mlReq.Query, "iris")
+	xVal, yVal, err := readMLData(h.sctx, params.batchSize, mlReq.Query, mlReq.CaseType)
 	if err != nil {
 		return nil, errors.Trace(err)
 	}

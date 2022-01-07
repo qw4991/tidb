@@ -93,6 +93,10 @@ func parseModelParams(model string, paramMap map[string]string) (modelParams, er
 	return res, nil
 }
 
+func constructModel4Iris() (g *gorgonia.ExprGraph, x, y *gorgonia.Node, learnables []*gorgonia.Node, loss *gorgonia.Node, err error) {
+	return nil, nil, nil, nil, nil, nil
+}
+
 func constructModel(params modelParams) (g *gorgonia.ExprGraph, x, y *gorgonia.Node, learnables []*gorgonia.Node, loss *gorgonia.Node, err error) {
 	// construct the computation graph
 	g = gorgonia.NewGraph()
@@ -170,10 +174,10 @@ func init() {
 	dt = tensor.Float64
 }
 
-	type convnet struct {
+type convnet struct {
 	g                  *gorgonia.ExprGraph
 	w0, w1, w2, w3, w4 *gorgonia.Node // weights. the number at the back indicates which layer it's used for
-	d0, d1, d2, d3     float64 // dropout probabilities
+	d0, d1, d2, d3     float64        // dropout probabilities
 
 	out *gorgonia.Node
 }
@@ -279,7 +283,6 @@ func (m *convnet) fwd(x *gorgonia.Node) (err error) {
 	m.out, err = gorgonia.SoftMax(out)
 	return
 }
-
 
 func constructModel2(params modelParams) (g *gorgonia.ExprGraph, x, y *gorgonia.Node, learnables []*gorgonia.Node, loss *gorgonia.Node, err error) {
 	g = gorgonia.NewGraph()
