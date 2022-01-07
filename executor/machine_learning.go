@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"gorgonia.org/tensor"
 	"strings"
 
 	"github.com/pingcap/tidb/distsql"
@@ -18,6 +17,7 @@ import (
 	"github.com/pingcap/tidb/util/logutil"
 	"github.com/pingcap/tidb/util/sqlexec"
 	"gorgonia.org/gorgonia"
+	"gorgonia.org/tensor"
 )
 
 type MLCreateModelExecutor struct {
