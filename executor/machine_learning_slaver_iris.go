@@ -60,7 +60,8 @@ func (h *CoprocessorDAGHandler) HandleSlaverTraining4Iris(mlReq MLModelReq) ([]b
 	gorgonia.Read(pred, &predicted)
 	squaredError := must(gorgonia.Square(must(gorgonia.Sub(pred, y))))
 	cost := must(gorgonia.Mean(squaredError))
-	if _, err := gorgonia.Grad(cost, theta); err != nil {
+	grads, err := gorgonia.Grad(cost, theta)
+	if err != nil {
 		logMaster("Failed to backpropagate: %v", err)
 		os.Exit(0)
 	}
@@ -80,8 +81,8 @@ func (h *CoprocessorDAGHandler) HandleSlaverTraining4Iris(mlReq MLModelReq) ([]b
 		fmt.Println(">>>>>> ", err)
 		os.Exit(0)
 	}
-	machine.Reset() // Reset is necessary in a loop like this
 
+	grad := grads[0]
 	fmt.Printf("theta: %2.2f  Iter: %v Cost: %2.3f Accuracy: %2.2f \r",
 		theta.Value(),
 		mlReq.Iter,
@@ -90,7 +91,7 @@ func (h *CoprocessorDAGHandler) HandleSlaverTraining4Iris(mlReq MLModelReq) ([]b
 
 	var encodeBuf bytes.Buffer
 	enc := gob.NewEncoder(&encodeBuf)
-	if err := enc.Encode(theta.Value()); err != nil {
+	if err := enc.Encode(grad.Value()); err != nil {
 		return nil, err
 	}
 	return encodeBuf.Bytes(), nil

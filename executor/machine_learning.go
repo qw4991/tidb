@@ -147,6 +147,7 @@ func (ml *MLTrainModelExecutor) train4Iris2(ctx context.Context) ([]byte, error)
 			if err = decoder.Decode(&grads); err != nil {
 				return nil, err
 			}
+
 			slaverGrads = append(slaverGrads, grads)
 		}
 
