@@ -7,8 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/pingcap/tidb/util/logutil"
-	"gorgonia.org/gorgonia"
 	"strings"
 
 	"github.com/pingcap/tidb/distsql"
@@ -16,7 +14,9 @@ import (
 	"github.com/pingcap/tidb/kv"
 	plannercore "github.com/pingcap/tidb/planner/core"
 	"github.com/pingcap/tidb/util/chunk"
+	"github.com/pingcap/tidb/util/logutil"
 	"github.com/pingcap/tidb/util/sqlexec"
+	"gorgonia.org/gorgonia"
 )
 
 type MLCreateModelExecutor struct {
