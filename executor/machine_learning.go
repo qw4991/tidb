@@ -158,7 +158,10 @@ func (ml *MLTrainModelExecutor) train(ctx context.Context, model, parameters str
 			return nil, err
 		}
 
-		gradValues := convertGradValues(learnables, avgGrads)
+		gradValues, err := convertGradValues(learnables, avgGrads)
+		if err != nil {
+			return nil, err
+		}
 		if err := solver.Step(gradValues); err != nil {
 			return nil, err
 		}
@@ -201,11 +204,13 @@ func calAvgGrads(slaverGrads [][]gorgonia.Value) ([]gorgonia.Value, error) {
 	return values, nil
 }
 
-func convertGradValues(learnables []*gorgonia.Node, values []gorgonia.Value) []gorgonia.ValueGrad {
+func convertGradValues(learnables []*gorgonia.Node, values []gorgonia.Value) ([]gorgonia.ValueGrad, error) {
 	for i := 0; i < len(learnables); i++ {
-		learnables[i].SetGrad(values[i])
+		if err := learnables[i].SetGrad(values[i]); err != nil {
+			return nil, err
+		}
 	}
-	return gorgonia.NodesToValueGrads(learnables)
+	return gorgonia.NodesToValueGrads(learnables), nil
 }
 
 func (ml *MLTrainModelExecutor) constructMLReq(iter int, dataPartitionMap map[string]int, model, modelParameters string, modelData []byte) (*kv.Request, error) {
