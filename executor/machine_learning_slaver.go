@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"os"
 	"sync"
 
 	"github.com/pingcap/errors"
@@ -78,6 +79,24 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 	if err = gorgonia.Let(y, yVal); err != nil {
 		return nil, errors.Trace(err)
 	}
+
+	// TODO: for debug <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+	solver := gorgonia.NewVanillaSolver(gorgonia.WithLearnRate(params.learningRate))
+	for i := 0; i < 100; i++ {
+		if err = vm.RunAll(); err != nil {
+			return nil, errors.Trace(err)
+		}
+
+		logSlaver(self, "loss = %v", loss.Value().Data())
+
+		valueGrads := gorgonia.NodesToValueGrads(learnables)
+		if err := solver.Step(valueGrads); err != nil {
+			panic(err)
+		}
+		vm.Reset()
+	}
+	os.Exit(0)
+	// TODO: for debug <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 	// TODO: train the model with mlReq and return gradients: yifan, lanhai
 	if err = vm.RunAll(); err != nil {
