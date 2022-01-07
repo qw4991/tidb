@@ -178,25 +178,27 @@ func readMLData(sctx sessionctx.Context, batchSize int, query string) (x *tensor
 	}
 
 	n := len(rows)
-	xVal, yVal := make([]float64, 0, n*28*28), make([]float64, 0, n)
-	for _, r := range rows {
+	xVal, yVal := make([]float64, 0, n*28*28), make([]float64, 0, n*10)
+	for i, r := range rows {
+		if i == batchSize {
+			break
+		}
 		vx := r.GetBytes(0)
 		vy := r.GetFloat64(1)
 		for _, v := range vx {
 			xVal = append(xVal, float64(v))
 		}
-		yVal = append(yVal, vy)
-
-		if len(yVal) == batchSize {
-			break
+		label := int(vy)
+		for j := 0; j < 10; j++ {
+			if j == label {
+				yVal = append(yVal, 0.9)
+			} else {
+				yVal = append(yVal, 0.1)
+			}
 		}
 	}
 
-	y = tensor.New(tensor.WithShape(batchSize), tensor.WithBacking(yVal))
-	if err := y.Reshape(y.Shape()[0]); err != nil { // reshape to a vector
-		return nil, nil, errors.Trace(err)
-	}
-
+	y = tensor.New(tensor.WithShape(batchSize, 10), tensor.WithBacking(yVal))
 	// TODO: 28*28
 	x = tensor.New(tensor.WithShape(batchSize, 28*28), tensor.WithBacking(xVal))
 	return x, y, nil
