@@ -57,7 +57,9 @@ func NewRPCServer(config *config.Config, dom *domain.Domain, sm util.SessionMana
 		grpc.MaxConcurrentStreams(uint32(config.Status.GRPCConcurrentStreams)),
 		grpc.InitialWindowSize(int32(config.Status.GRPCInitialWindowSize)),
 		grpc.MaxSendMsgSize(config.Status.GRPCMaxSendMsgSize),
+		grpc.MaxRecvMsgSize(config.Status.GRPCMaxSendMsgSize),
 	)
+
 	rpcSrv := &rpcServer{
 		DiagnosticsServer: sysutil.NewDiagnosticsServer(config.Log.File.Filename),
 		dom:               dom,

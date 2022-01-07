@@ -65,7 +65,7 @@ func (h *CoprocessorDAGHandler) HandleSlaverTrainingReq(req []byte) ([]byte, err
 	}
 
 	self := fmt.Sprintf("%v:%v %v", util.GetLocalIP(), config.GetGlobalConfig().Port, config.GetGlobalConfig().Store)
-	fmt.Println(">>>>>>>>>>> receive req >> ", self, mlReq)
+	fmt.Println(">>>>>>>>>>> receive req >> ", self, len(mlReq.ModelData))
 
 	// TODO: read data: yuanjia, cache
 	xVal, yVal, err := readMLData(h.sctx, params.batchSize, mlReq.Query)

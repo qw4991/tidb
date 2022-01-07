@@ -679,7 +679,7 @@ var defaultConf = Config{
 		GRPCKeepAliveTimeout:  3,
 		GRPCConcurrentStreams: 1024,
 		GRPCInitialWindowSize: 2 * 1024 * 1024,
-		GRPCMaxSendMsgSize:    10 * 1024 * 1024,
+		GRPCMaxSendMsgSize:    10 * 1024 * 1024 * 1024,
 	},
 	Performance: Performance{
 		MaxMemory:             0,
