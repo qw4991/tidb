@@ -1,7 +1,9 @@
 package executor
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
 	"fmt"
 	"github.com/pingcap/errors"
 	"github.com/pingcap/tidb/util/sqlexec"
@@ -119,7 +121,7 @@ func (ml *MLTrainModelExecutor) train4Mnist(ctx context.Context) ([]byte, error)
 	batches := numExamples / bs
 	log.Printf("Batches %d", batches)
 
-	epochs := 50
+	epochs := 2
 	for i := 0; i < epochs; i++ {
 		fmt.Println("Epoch ", i)
 		for b := 0; b < batches; b++ {
@@ -190,7 +192,17 @@ func (ml *MLTrainModelExecutor) train4Mnist(ctx context.Context) ([]byte, error)
 		}
 	}
 
-	return nil, nil
+	var encodeBuf bytes.Buffer
+	enc := gob.NewEncoder(&encodeBuf)
+	weights := m.learnables()
+	vals := make([]G.Value, 0, len(weights))
+	for _, w := range weights {
+		vals = append(vals, w.Value())
+	}
+	if err := enc.Encode(vals); err != nil {
+		return nil, err
+	}
+	return encodeBuf.Bytes(), nil
 }
 
 func prepareX(M []RawImage, dt tensor.Dtype) (retVal tensor.Tensor) {
@@ -234,9 +246,9 @@ func prepareY(N []Label, dt tensor.Dtype) (retVal tensor.Tensor) {
 		for i := 0; i < rows; i++ {
 			for j := 0; j < 10; j++ {
 				if j == int(N[i]) {
-					b = append(b, 0.9)
+					b = append(b, 1.0)
 				} else {
-					b = append(b, 0.1)
+					b = append(b, 0.0)
 				}
 			}
 		}
