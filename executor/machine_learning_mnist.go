@@ -1,7 +1,6 @@
 package executor
 
 import (
-	"bytes"
 	"context"
 	"encoding/gob"
 	"fmt"
@@ -11,6 +10,7 @@ import (
 	"gorgonia.org/tensor"
 	"log"
 	"math"
+	"os"
 )
 
 // Image holds the pixel intensities of an image.
@@ -121,7 +121,7 @@ func (ml *MLTrainModelExecutor) train4Mnist(ctx context.Context) ([]byte, error)
 	batches := numExamples / bs
 	log.Printf("Batches %d", batches)
 
-	epochs := 2
+	epochs := 1
 	for i := 0; i < epochs; i++ {
 		fmt.Println("Epoch ", i)
 		for b := 0; b < batches; b++ {
@@ -192,8 +192,13 @@ func (ml *MLTrainModelExecutor) train4Mnist(ctx context.Context) ([]byte, error)
 		}
 	}
 
-	var encodeBuf bytes.Buffer
-	enc := gob.NewEncoder(&encodeBuf)
+	fileName := "./weights.bin"
+	f, err := os.Create(fileName)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	enc := gob.NewEncoder(f)
 	weights := m.learnables()
 	vals := make([]G.Value, 0, len(weights))
 	for _, w := range weights {
@@ -202,7 +207,9 @@ func (ml *MLTrainModelExecutor) train4Mnist(ctx context.Context) ([]byte, error)
 	if err := enc.Encode(vals); err != nil {
 		return nil, err
 	}
-	return encodeBuf.Bytes(), nil
+
+	return []byte(fileName), nil
+
 }
 
 func prepareX(M []RawImage, dt tensor.Dtype) (retVal tensor.Tensor) {

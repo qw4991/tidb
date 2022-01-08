@@ -7,6 +7,7 @@ import (
 	"gorgonia.org/gorgonia"
 	"gorgonia.org/tensor"
 	"math"
+	"os"
 	"strings"
 
 	"github.com/pingcap/tidb/dumpling/context"
@@ -153,12 +154,17 @@ func (b *builtinMLApplySig) evalReal(row chunk.Row) (float64, bool, error) {
 	if len(rows) == 0 {
 		return 0, false, fmt.Errorf("model %v not found", modelName)
 	}
-	modelData := rows[0].GetBytes(0)
-	fmt.Println(">>>>>>>>>>>>>> ", len(modelData))
+	weightsFileBytes := rows[0].GetBytes(0)
+	weightsFile := string(weightsFileBytes[:])
+	fmt.Println(weightsFile)
 
-	decodeDuf := bytes.NewBuffer(modelData)
-	dec := gob.NewDecoder(decodeDuf)
-	var weights []*tensor.Dense
+	f, err := os.Open(weightsFile)
+	if err != nil {
+		return 0, false, nil
+	}
+	defer f.Close()
+	dec := gob.NewDecoder(f)
+	weights := make([]gorgonia.Value, 0, 10)
 	err = dec.Decode(&weights)
 	if err != nil {
 		return 0, false, nil
@@ -204,6 +210,7 @@ func (b *builtinMLApplySig) evalReal(row chunk.Row) (float64, bool, error) {
 	}
 
 	pred := m.out.Value().Data().([]float64)
+	fmt.Printf("pred = %v\n", pred)
 	idx := -1
 	for j := 0; j < 10; j++ {
 		if idx == -1 || math.Abs(pred[j]) > math.Abs(pred[idx]) {
