@@ -75,7 +75,6 @@ func (ml *MLTrainModelExecutor) Next(ctx context.Context, req *chunk.Chunk) erro
 
 	var modelData []byte
 	if strings.Contains(strings.ToLower(ml.v.Model), "iris") {
-		//modelData, err = ml.train4Iris(ctx)
 		modelData, err = ml.train4Iris2(ctx)
 	} else {
 		// start to training this model
@@ -112,7 +111,7 @@ func (ml *MLTrainModelExecutor) train4Iris2(ctx context.Context) ([]byte, error)
 	}
 
 	solver := gorgonia.NewVanillaSolver(gorgonia.WithLearnRate(0.001))
-	model := []gorgonia.ValueGrad{theta}
+	//model := []gorgonia.ValueGrad{theta}
 
 	machine := gorgonia.NewTapeMachine(g, gorgonia.BindDualValues(theta))
 	defer machine.Close()
@@ -156,12 +155,21 @@ func (ml *MLTrainModelExecutor) train4Iris2(ctx context.Context) ([]byte, error)
 		if len(slaverGrads) == 1 {
 			avgGrad = slaverGrads[0]
 		} else {
-			panic("TODO")
+			//panic("TODO")
+			//avgGrad = calAvgGrads(slaverGrads)[0]
+			avgGrad = slaverGrads[0]
+			for k := 1; k < len(slaverGrads); k++ {
+				avgGrad, _ = tensor.Add(slaverGrads[k], avgGrad)
+			}
+			avgGrad, _ = tensor.Div(avgGrad, float64(len(slaverGrads)))
+
 		}
 
 		if err := theta.SetGrad(avgGrad); err != nil {
 			return nil, err
 		}
+
+		model := []gorgonia.ValueGrad{theta}
 
 		if err := solver.Step(model); err != nil {
 			return nil, err
